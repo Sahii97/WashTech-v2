@@ -3,7 +3,7 @@ export default {
   content: ['./index.html', './src/**/*.{ts,tsx}'],
   theme: {
     extend: {
-      fontFamily: { sans: ['Inter', 'sans-serif'] },
+      fontFamily: { sans: ['IBM Plex Sans Arabic', 'sans-serif'] },
       colors: {
         brand: {
           50:  '#eff6ff',

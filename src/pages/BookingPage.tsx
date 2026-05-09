@@ -17,8 +17,7 @@ export default function BookingPage() {
   const [neighborhoods, setNeighborhoods] = useState<string[]>([]);
   const [gpsLoading, setGpsLoading] = useState(false);
   const [gpsError, setGpsError] = useState('');
-  const [trackId, setTrackId] = useState('');
-  const [trackResult, setTrackResult] = useState<any>(null);
+  const [trackOpen, setTrackOpen] = useState(false);
 
   const [form, setForm] = useState({
     name: '', phone: '', neighborhood: '',
@@ -82,29 +81,12 @@ export default function BookingPage() {
     } catch { setErrorMsg('Network error'); setStatus('error'); }
   }
 
-  async function track() {
-    if (!trackId.trim()) return;
-    try {
-      const res = await fetch(`/api/bookings/${trackId.trim()}`);
-      const data = await res.json();
-      setTrackResult(data);
-    } catch { setTrackResult({ error: true }); }
-  }
-
   function switchLang(l: Lang) {
     setLang(l);
     localStorage.setItem(LANG_KEY, l);
     document.documentElement.dir = t[l].dir;
     document.documentElement.lang = l;
   }
-
-  const statusColors: Record<string, string> = {
-    pending: 'bg-amber-100 text-amber-700',
-    approved: 'bg-green-100 text-green-700',
-    rejected: 'bg-red-100 text-red-700',
-    on_process: 'bg-blue-100 text-blue-700',
-    completed: 'bg-slate-100 text-slate-700',
-  };
 
   if (status === 'success') {
     return (
@@ -117,12 +99,39 @@ export default function BookingPage() {
           </div>
           <h2 className="text-2xl font-bold text-slate-900 mb-2">{tr.success}</h2>
           <p className="text-slate-500 mb-6">{tr.successMsg}</p>
-          <div className="bg-slate-50 rounded-xl p-4 mb-6 text-left">
-            <p className="text-xs text-slate-400 mb-1">{tr.bookingId}</p>
-            <p className="font-mono text-sm font-semibold text-slate-800 break-all">{bookingId}</p>
+
+          {/* Collapsible track bar */}
+          <div className="mb-4 border border-slate-200 rounded-xl overflow-hidden text-start">
+            <button
+              onClick={() => setTrackOpen(o => !o)}
+              className="w-full flex items-center justify-between px-4 py-3 bg-slate-50 hover:bg-slate-100 transition-colors"
+            >
+              <span className="text-sm font-medium text-slate-700">
+                🔎 {lang === 'ar' ? 'تتبع طلبي' : 'ئۆردەرم بشوێندەبکەوە'}
+              </span>
+              <svg
+                className={`w-4 h-4 text-slate-400 transition-transform ${trackOpen ? 'rotate-180' : ''}`}
+                fill="none" viewBox="0 0 24 24" stroke="currentColor"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            {trackOpen && (
+              <div className="px-4 py-3 bg-white border-t border-slate-200">
+                <p className="text-xs text-slate-400 mb-1">{tr.bookingId}</p>
+                <p className="font-mono text-xs font-semibold text-slate-800 break-all mb-3">{bookingId}</p>
+                <a
+                  href={`/track?phone=${encodeURIComponent(form.phone)}`}
+                  className="block w-full py-2 bg-slate-900 hover:bg-slate-700 text-white text-sm font-semibold rounded-xl text-center transition-colors"
+                >
+                  {lang === 'ar' ? 'تتبع باستخدام رقم الهاتف' : 'بە ژمارەی تەلەفۆن شوێندەکەوە'}
+                </a>
+              </div>
+            )}
           </div>
+
           <button
-            onClick={() => { setStatus('idle'); setStep(1); setForm({ name:'',phone:'',neighborhood:'',carType:'',package:'',date:'today',slot:'' }); }}
+            onClick={() => { setStatus('idle'); setStep(1); setTrackOpen(false); setForm({ name:'',phone:'',neighborhood:'',carType:'',package:'',date:'today',slot:'' }); }}
             className="w-full py-3 bg-brand-600 hover:bg-brand-700 text-white font-semibold rounded-xl transition-colors"
           >
             {tr.newBooking}
@@ -311,31 +320,11 @@ export default function BookingPage() {
           {status === 'error' && <p className="mt-3 text-sm text-red-600 text-center">{errorMsg}</p>}
         </div>
 
-        {/* Booking tracker */}
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 mt-4">
-          <h3 className="font-bold text-slate-900 mb-4">{tr.trackBooking}</h3>
-          <div className="flex gap-2">
-            <input
-              className={`${input} flex-1`}
-              placeholder={tr.enterBookingId}
-              value={trackId}
-              onChange={e => setTrackId(e.target.value)}
-            />
-            <button
-              onClick={track}
-              className="px-4 py-2 bg-slate-900 text-white font-semibold rounded-xl hover:bg-slate-800 transition-colors text-sm"
-            >
-              {tr.track}
-            </button>
-          </div>
-          {trackResult && !trackResult.error && (
-            <div className="mt-3 p-3 bg-slate-50 rounded-xl">
-              <p className="text-xs text-slate-500 mb-1">{tr.status}</p>
-              <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${statusColors[trackResult.status] || 'bg-slate-100 text-slate-700'}`}>
-                {(tr as any)[trackResult.status] || trackResult.status}
-              </span>
-            </div>
-          )}
+        {/* Track link */}
+        <div className="mt-4 text-center">
+          <a href="/track" className="text-sm text-slate-400 hover:text-brand-600 transition-colors">
+            🔎 {lang === 'ar' ? 'تتبع حجز سابق' : 'حجزێکی پێشوو شوێندەکەوە'}
+          </a>
         </div>
       </main>
     </div>

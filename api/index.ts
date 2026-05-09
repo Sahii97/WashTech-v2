@@ -22,6 +22,7 @@ const db = getFirestore(fbApp, process.env.FIREBASE_DATABASE_ID || 'ai-studio-ae
 const WASENDER_TOKEN = process.env.WASENDER_API_TOKEN || '';
 const MANAGER_PHONE  = process.env.MANAGER_PHONE      || '+9647809471576';
 const N8N_WEBHOOK    = process.env.N8N_WEBHOOK_URL    || '';
+const APP_URL        = process.env.APP_URL             || 'https://washtech-v2.vercel.app';
 
 const DEFAULT_SLOTS = [
   '09:00 AM','10:00 AM','11:00 AM','12:00 PM','01:00 PM',
@@ -44,6 +45,11 @@ async function getSetting<T>(key: string, def: T): Promise<T> {
 async function setSetting(key: string, value: any) {
   await setDoc(doc(db, 'settings', key), { value });
 }
+async function getManagers() {
+  const snap = await getDocs(collection(db, 'managers'));
+  return snap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
+}
+
 async function getDrivers() {
   const snap = await getDocs(collection(db, 'drivers'));
   if (snap.empty) {
@@ -61,8 +67,8 @@ export interface TemplateConfig { enabled: boolean; template: string; }
 export type NotificationTemplates = Record<EventKey, TemplateConfig>;
 
 const DEFAULT_TEMPLATES: NotificationTemplates = {
-  new_booking:      { enabled: true, template: '📦 حجز جديد #{{id}}\n👤 {{name}}\n📞 {{phone}}\n📍 {{neighborhood}}\n🚗 {{carType}} — {{package}}\n🕐 {{date}} {{slot}}' },
-  booking_approved: { enabled: true, template: '✅ لديك حجز جديد\n👤 {{name}}\n📞 {{phone}}\n📍 {{neighborhood}}\n🕐 {{slot}}\n\nافتح تطبيق السائق واضغط قبول المهمة' },
+  new_booking:      { enabled: true, template: '📦 حجز جديد #{{id}}\n👤 {{name}}\n📞 {{phone}}\n📍 {{neighborhood}}\n🚗 {{carType}} — {{package}}\n🕐 {{date}} {{slot}}\n\n✅ موافقة: {{approveLink}}\n❌ رفض: {{rejectLink}}' },
+  booking_approved: { enabled: true, template: '✅ لديك حجز جديد\n👤 {{name}}\n📞 {{phone}}\n📍 {{neighborhood}}\n🕐 {{slot}}\n\n▶️ قبول المهمة:\n{{acceptLink}}' },
   driver_accepted:  { enabled: true, template: '🚗 سائقك في الطريق إليك!\n👨‍💼 السائق: {{driverName}}\n🕐 الوقت: {{slot}}\nسيصل قريباً. شكراً لاختيارك WashTech! 🧼' },
   booking_rejected: { enabled: true, template: '❌ عذراً، لم نتمكن من قبول حجزك في هذا الوقت.\nيرجى المحاولة مرة أخرى أو اختيار وقت آخر.\nWashTech 🚗' },
 };
@@ -179,6 +185,8 @@ app.post('/api/bookings', async (req, res) => {
       package: booking.package || '',
       date: booking.date === 'today' ? 'اليوم' : 'غداً',
       slot: booking.slot || '',
+      approveLink: `${APP_URL}/action?id=${id}&act=approve`,
+      rejectLink:  `${APP_URL}/action?id=${id}&act=reject`,
     }, MANAGER_PHONE).catch(console.error);
     res.json({ success: true, id });
   } catch (e) {
@@ -203,11 +211,38 @@ app.get('/api/bookings/:id', async (req, res) => {
   } catch { res.status(500).json({ error: 'Failed' }); }
 });
 
+// ── Manager accounts (Firestore) ──────────────────────────────
+app.get('/api/admin/managers', async (_req, res) => {
+  const managers = await getManagers();
+  res.json({ managers: managers.map(m => ({ id: m.id, name: m.name, username: m.username })) });
+});
+
+app.post('/api/admin/create-manager', async (req, res) => {
+  const { name, username, password } = req.body;
+  if (!name || !username || !password) return res.status(400).json({ error: 'All fields required' });
+  const id = `mgr${Date.now()}`;
+  await setDoc(doc(db, 'managers', id), { name, username, password });
+  res.json({ success: true, manager: { id, name, username } });
+});
+
+app.delete('/api/admin/manager/:id', async (req, res) => {
+  await deleteDoc(doc(db, 'managers', req.params.id));
+  res.json({ success: true });
+});
+
 // ── Manager ───────────────────────────────────────────────────
-app.post('/api/manager/login', (req, res) => {
-  const { password } = req.body;
-  if (password === (process.env.MANAGER_PASSWORD || 'admin123')) res.json({ success: true });
-  else res.status(401).json({ error: 'Wrong password' });
+app.post('/api/manager/login', async (req, res) => {
+  const { username, password } = req.body;
+  // Check Firestore managers collection
+  if (username) {
+    const managers = await getManagers();
+    const manager = managers.find((m: any) => m.username === username && m.password === password);
+    if (manager) return res.json({ success: true, manager: { id: manager.id, name: manager.name, username: manager.username } });
+    return res.status(401).json({ error: 'Invalid credentials' });
+  }
+  // Legacy: password-only fallback
+  if (password === (process.env.MANAGER_PASSWORD || 'admin123')) return res.json({ success: true });
+  res.status(401).json({ error: 'Wrong password' });
 });
 
 app.post('/api/manager/action', async (req, res) => {
@@ -226,6 +261,7 @@ app.post('/api/manager/action', async (req, res) => {
         name: booking?.name || '', phone: booking?.phone || '',
         neighborhood: booking?.neighborhood || '', slot: booking?.slot || '',
         driverName: driver.name, driverPhone: driver.phone || '',
+        acceptLink: `${APP_URL}/action?id=${bookingId}&act=accept`,
       }, driver.phone || MANAGER_PHONE).catch(console.error);
 
     } else if (action === 'reject') {
@@ -313,8 +349,8 @@ app.post('/api/admin/notification-templates', async (req, res) => {
 
 // ── Test notifications ────────────────────────────────────────
 const DUMMY_VARS: Record<EventKey, (to: string) => Record<string, string>> = {
-  new_booking:      to => ({ id: 'TEST1', name: 'محمد أحمد', phone: to, neighborhood: 'عنكاوة', carType: 'سيدان', package: 'غسيل كامل', date: 'اليوم', slot: '10:00 AM' }),
-  booking_approved: to => ({ name: 'محمد أحمد', phone: to, neighborhood: 'عنكاوة', slot: '10:00 AM', driverName: 'علي', driverPhone: to }),
+  new_booking:      to => ({ id: 'TEST1', name: 'محمد أحمد', phone: to, neighborhood: 'عنكاوة', carType: 'سيدان', package: 'غسيل كامل', date: 'اليوم', slot: '10:00 AM', approveLink: `${APP_URL}/action?id=TEST1&act=approve`, rejectLink: `${APP_URL}/action?id=TEST1&act=reject` }),
+  booking_approved: to => ({ name: 'محمد أحمد', phone: to, neighborhood: 'عنكاوة', slot: '10:00 AM', driverName: 'علي', driverPhone: to, acceptLink: `${APP_URL}/action?id=TEST1&act=accept` }),
   driver_accepted:  to => ({ name: 'محمد أحمد', phone: to, driverName: 'علي', slot: '10:00 AM' }),
   booking_rejected: to => ({ name: 'محمد أحمد', phone: to }),
 };
@@ -356,6 +392,82 @@ app.post('/api/admin/test-all-notifications', async (req, res) => {
     await new Promise(r => setTimeout(r, 600));
   }
   res.json({ success: true, sentTo: to, results });
+});
+
+// ── Action endpoint (approve/reject/accept via WhatsApp link) ─
+app.get('/api/action', async (req, res) => {
+  const { id } = req.query as { id?: string };
+  if (!id) return res.status(400).json({ error: 'Missing id' });
+  try {
+    const bsnap = await getDoc(doc(db, 'bookings', id));
+    if (!bsnap.exists()) return res.status(404).json({ error: 'Booking not found' });
+    res.json({ booking: { id, ...bsnap.data() } });
+  } catch { res.status(500).json({ error: 'Failed' }); }
+});
+
+app.post('/api/action', async (req, res) => {
+  const { id, act, driverId: selectedDriver } = req.body;
+  if (!id || !act) return res.status(400).json({ error: 'Missing fields' });
+  try {
+    const bookingRef = doc(db, 'bookings', id);
+    const bsnap = await getDoc(bookingRef);
+    if (!bsnap.exists()) return res.status(404).json({ error: 'Booking not found' });
+    const booking = bsnap.data() as any;
+
+    if (act === 'approve') {
+      const driverId = selectedDriver || booking.driverId;
+      if (!driverId) return res.status(400).json({ error: 'Driver required' });
+      await updateDoc(bookingRef, { status: 'approved', driverId, updatedAt: new Date().toISOString() });
+      const driverDoc = await getDoc(doc(db, 'drivers', driverId));
+      const driver = driverDoc.exists() ? (driverDoc.data() as any) : { name: 'السائق', phone: '' };
+      await notify('booking_approved', {
+        name: booking.name || '', phone: booking.phone || '',
+        neighborhood: booking.neighborhood || '', slot: booking.slot || '',
+        driverName: driver.name, driverPhone: driver.phone || '',
+        acceptLink: `${APP_URL}/action?id=${id}&act=accept`,
+      }, driver.phone || MANAGER_PHONE);
+      res.json({ success: true, message: 'تم قبول الحجز وإشعار السائق' });
+
+    } else if (act === 'reject') {
+      await updateDoc(bookingRef, { status: 'rejected', updatedAt: new Date().toISOString() });
+      await notify('booking_rejected', {
+        name: booking.name || '', phone: booking.phone || '',
+      }, booking.phone || '');
+      res.json({ success: true, message: 'تم رفض الحجز وإشعار العميل' });
+
+    } else if (act === 'accept') {
+      const driverId = booking.driverId;
+      await updateDoc(bookingRef, { status: 'on_process', updatedAt: new Date().toISOString() });
+      const driverDoc = driverId ? await getDoc(doc(db, 'drivers', driverId)) : null;
+      const driver = driverDoc?.exists() ? (driverDoc.data() as any) : { name: 'السائق' };
+      await notify('driver_accepted', {
+        name: booking.name || '', phone: booking.phone || '',
+        driverName: driver.name, slot: booking.slot || '',
+      }, booking.phone || '');
+      res.json({ success: true, message: 'تم قبول المهمة وإشعار العميل' });
+
+    } else {
+      res.status(400).json({ error: 'Invalid action' });
+    }
+  } catch (e) {
+    console.error('[action]', e);
+    res.status(500).json({ error: 'Failed' });
+  }
+});
+
+// ── Track by phone ────────────────────────────────────────────
+app.get('/api/track', async (req, res) => {
+  const { phone } = req.query as { phone?: string };
+  if (!phone) return res.status(400).json({ error: 'Phone required' });
+  try {
+    const snap = await getDocs(collection(db, 'bookings'));
+    const clean = (p: string) => p.replace(/\s+/g, '');
+    const bookings = snap.docs
+      .map(d => ({ id: d.id, ...d.data() as any }))
+      .filter(b => clean(b.phone || '') === clean(phone))
+      .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+    res.json({ bookings });
+  } catch { res.status(500).json({ error: 'Failed' }); }
 });
 
 export default app;

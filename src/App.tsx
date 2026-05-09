@@ -4,6 +4,8 @@ import BookingPage from './pages/BookingPage';
 import ManagerDashboard from './pages/ManagerDashboard';
 import DriverView from './pages/DriverView';
 import AdminDashboard from './pages/AdminDashboard';
+import ActionPage from './pages/ActionPage';
+import TrackPage from './pages/TrackPage';
 
 function DevNav() {
   const params = new URLSearchParams(window.location.search);
@@ -43,6 +45,8 @@ export default function App() {
         <Route path="/manager" element={<ManagerDashboard />} />
         <Route path="/driver" element={<DriverView />} />
         <Route path="/admin" element={<AdminDashboard />} />
+        <Route path="/action" element={<ActionPage />} />
+        <Route path="/track" element={<TrackPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
