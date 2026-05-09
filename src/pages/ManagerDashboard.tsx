@@ -20,12 +20,16 @@ export default function ManagerDashboard() {
   const [loading, setLoading] = useState(false);
 
   async function login() {
-    const res = await fetch('/api/manager/login', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username: username.trim(), password }),
-    });
-    if (res.ok) { setAuthed(true); load(); }
-    else setLoginError('بيانات الدخول غير صحيحة');
+    setLoginError('');
+    try {
+      const res = await fetch('/api/manager/login', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: username.trim(), password }),
+      });
+      const data = await res.json();
+      if (res.ok) { setAuthed(true); load(); }
+      else setLoginError(data.error || 'بيانات الدخول غير صحيحة');
+    } catch { setLoginError('خطأ في الاتصال، حاول مرة أخرى'); }
   }
 
   async function load() {
