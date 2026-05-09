@@ -15,11 +15,13 @@ const DEFAULT_TEMPLATES: Templates = {
 const EVENT_META: {
   key: EventKey; label: string; recipient: string; vars: string[];
 }[] = [
-  { key: 'new_booking',      label: '📦 New Booking → Manager',   recipient: 'Sent to: Manager',  vars: ['id','name','phone','neighborhood','carType','package','date','slot'] },
-  { key: 'booking_approved', label: '✅ Booking Approved → Driver', recipient: 'Sent to: Driver',   vars: ['name','phone','neighborhood','slot','driverName','driverPhone'] },
+  { key: 'new_booking',      label: '📦 New Booking → Manager',       recipient: 'Sent to: Manager',  vars: ['id','name','phone','neighborhood','carType','package','date','slot','approveLink','rejectLink'] },
+  { key: 'booking_approved', label: '✅ Booking Approved → Driver',    recipient: 'Sent to: Driver',   vars: ['name','phone','neighborhood','slot','driverName','driverPhone','acceptLink'] },
   { key: 'driver_accepted',  label: '🚗 Driver On The Way → Customer', recipient: 'Sent to: Customer', vars: ['name','phone','driverName','slot'] },
-  { key: 'booking_rejected', label: '❌ Booking Rejected → Customer', recipient: 'Sent to: Customer', vars: ['name','phone'] },
+  { key: 'booking_rejected', label: '❌ Booking Rejected → Customer',  recipient: 'Sent to: Customer', vars: ['name','phone'] },
 ];
+
+type Manager = { id: string; name: string; username: string };
 
 export default function AdminDashboard() {
   const [drivers, setDrivers] = useState<Driver[]>([]);
@@ -31,20 +33,25 @@ export default function AdminDashboard() {
   const [neighborhoods, setNeighborhoods] = useState<string[]>([]);
   const [newNeighborhood, setNewNeighborhood] = useState('');
   const [neighborhoodStatus, setNeighborhoodStatus] = useState('');
+  const [managers, setManagers] = useState<Manager[]>([]);
+  const [newManager, setNewManager] = useState({ name: '', username: '', password: '' });
+  const [managerStatus, setManagerStatus] = useState('');
 
   useEffect(() => { load(); }, []);
 
   async function load() {
-    const [d, b, s, n] = await Promise.all([
+    const [d, b, s, n, m] = await Promise.all([
       fetch('/api/drivers').then(r => r.json()),
       fetch('/api/bookings').then(r => r.json()),
       fetch('/api/slots').then(r => r.json()),
       fetch('/api/neighborhoods').then(r => r.json()),
+      fetch('/api/admin/managers').then(r => r.json()),
     ]);
     setDrivers(d.drivers || []);
     setBookingCount((b.bookings || []).length);
     setSlots(s.slots || []);
     setNeighborhoods(n.neighborhoods || []);
+    setManagers(m.managers || []);
   }
 
   async function createDriver(e: React.FormEvent) {
@@ -60,6 +67,23 @@ export default function AdminDashboard() {
 
   async function deleteDriver(id: string) {
     await fetch(`/api/admin/driver/${id}`, { method: 'DELETE' });
+    load();
+  }
+
+  async function createManager(e: React.FormEvent) {
+    e.preventDefault();
+    if (!newManager.name || !newManager.username || !newManager.password) return;
+    const res = await fetch('/api/admin/create-manager', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newManager),
+    });
+    if (res.ok) { setNewManager({ name: '', username: '', password: '' }); setManagerStatus('Manager created ✓'); load(); }
+    else { const d = await res.json(); setManagerStatus(d.error || 'Error'); }
+    setTimeout(() => setManagerStatus(''), 3000);
+  }
+
+  async function deleteManager(id: string) {
+    await fetch(`/api/admin/manager/${id}`, { method: 'DELETE' });
     load();
   }
 
@@ -232,6 +256,61 @@ export default function AdminDashboard() {
                   <p className="text-xs text-slate-400 font-mono">Code: {d.code}{d.phone ? ` · ${d.phone}` : ''}</p>
                 </div>
                 <button onClick={() => deleteDriver(d.id)} className="text-red-400 hover:text-red-600 text-sm transition-colors">
+                  Remove
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Manager accounts */}
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+          <h2 className="font-bold text-slate-900 mb-4 text-sm uppercase tracking-wider">Manager Accounts</h2>
+          <form onSubmit={createManager} className="space-y-2 mb-4">
+            <input
+              placeholder="Full Name"
+              className="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              value={newManager.name}
+              onChange={e => setNewManager(p => ({ ...p, name: e.target.value }))}
+              required
+            />
+            <div className="flex gap-2">
+              <input
+                placeholder="Username"
+                className="flex-1 px-3 py-2 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                value={newManager.username}
+                onChange={e => setNewManager(p => ({ ...p, username: e.target.value }))}
+                required
+              />
+              <input
+                placeholder="Password"
+                type="password"
+                className="flex-1 px-3 py-2 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                value={newManager.password}
+                onChange={e => setNewManager(p => ({ ...p, password: e.target.value }))}
+                required
+              />
+              <button type="submit" className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl text-sm transition-colors">
+                Add
+              </button>
+            </div>
+          </form>
+          {managerStatus && (
+            <p className={`text-sm mb-3 ${managerStatus.includes('✓') ? 'text-green-600' : 'text-red-500'}`}>
+              {managerStatus}
+            </p>
+          )}
+          <div className="space-y-2">
+            {managers.length === 0 && (
+              <p className="text-sm text-slate-400 text-center py-3">No managers yet</p>
+            )}
+            {managers.map(m => (
+              <div key={m.id} className="flex items-center justify-between bg-slate-50 rounded-xl px-4 py-3">
+                <div>
+                  <p className="font-medium text-slate-900 text-sm">{m.name}</p>
+                  <p className="text-xs text-slate-400 font-mono">@{m.username}</p>
+                </div>
+                <button onClick={() => deleteManager(m.id)} className="text-red-400 hover:text-red-600 text-sm transition-colors">
                   Remove
                 </button>
               </div>

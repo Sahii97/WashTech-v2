@@ -10,6 +10,7 @@ type Tab = 'pending' | 'approved' | 'rejected';
 
 export default function ManagerDashboard() {
   const [authed, setAuthed] = useState(false);
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loginError, setLoginError] = useState('');
   const [bookings, setBookings] = useState<Booking[]>([]);
@@ -21,10 +22,10 @@ export default function ManagerDashboard() {
   async function login() {
     const res = await fetch('/api/manager/login', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ password }),
+      body: JSON.stringify({ username: username.trim(), password }),
     });
     if (res.ok) { setAuthed(true); load(); }
-    else setLoginError('كلمة المرور غير صحيحة');
+    else setLoginError('بيانات الدخول غير صحيحة');
   }
 
   async function load() {
@@ -63,7 +64,16 @@ export default function ManagerDashboard() {
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-8 max-w-sm w-full">
           <h1 className="text-2xl font-bold text-slate-900 mb-1">لوحة المدير</h1>
-          <p className="text-slate-500 text-sm mb-6">أدخل كلمة المرور للمتابعة</p>
+          <p className="text-slate-500 text-sm mb-6">أدخل بيانات الدخول للمتابعة</p>
+          <input
+            type="text"
+            className="w-full px-4 py-3 border border-slate-300 rounded-xl mb-3 focus:outline-none focus:ring-2 focus:ring-brand-500"
+            placeholder="اسم المستخدم"
+            value={username}
+            onChange={e => setUsername(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && login()}
+            dir="ltr"
+          />
           <input
             type="password"
             className="w-full px-4 py-3 border border-slate-300 rounded-xl mb-3 focus:outline-none focus:ring-2 focus:ring-brand-500"
