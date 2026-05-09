@@ -233,16 +233,22 @@ app.delete('/api/admin/manager/:id', async (req, res) => {
 // ── Manager ───────────────────────────────────────────────────
 app.post('/api/manager/login', async (req, res) => {
   const { username, password } = req.body;
-  // Check Firestore managers collection
-  if (username) {
-    const managers = await getManagers();
-    const manager = managers.find((m: any) => m.username === username && m.password === password);
-    if (manager) return res.json({ success: true, manager: { id: manager.id, name: manager.name, username: manager.username } });
-    return res.status(401).json({ error: 'Invalid credentials' });
+  try {
+    if (username?.trim()) {
+      const managers = await getManagers();
+      const manager = managers.find((m: any) => m.username === username.trim() && m.password === password);
+      if (manager) return res.json({ success: true, manager: { id: manager.id, name: manager.name, username: manager.username } });
+      // If managers exist in Firestore but none matched → wrong credentials
+      if (managers.length > 0) return res.status(401).json({ error: 'Invalid credentials' });
+      // No managers created yet → fall through to legacy
+    }
+    // Legacy password fallback (default: admin123)
+    if (password === (process.env.MANAGER_PASSWORD || 'admin123')) return res.json({ success: true });
+    res.status(401).json({ error: 'Invalid credentials' });
+  } catch (e) {
+    console.error('[manager/login]', e);
+    res.status(500).json({ error: 'Server error, try again' });
   }
-  // Legacy: password-only fallback
-  if (password === (process.env.MANAGER_PASSWORD || 'admin123')) return res.json({ success: true });
-  res.status(401).json({ error: 'Wrong password' });
 });
 
 app.post('/api/manager/action', async (req, res) => {
