@@ -15,6 +15,8 @@ export default function BookingPage() {
   const [errorMsg, setErrorMsg] = useState('');
   const [slots, setSlots] = useState<string[]>([]);
   const [neighborhoods, setNeighborhoods] = useState<string[]>([]);
+  const [gpsLoading, setGpsLoading] = useState(false);
+  const [gpsError, setGpsError] = useState('');
   const [trackId, setTrackId] = useState('');
   const [trackResult, setTrackResult] = useState<any>(null);
 
@@ -29,6 +31,38 @@ export default function BookingPage() {
   }, []);
 
   const set = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }));
+
+  async function detectLocation() {
+    if (!navigator.geolocation) { setGpsError(lang === 'ar' ? 'GPS غير مدعوم' : 'GPS نەگنجاو'); return; }
+    setGpsLoading(true);
+    setGpsError('');
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        try {
+          const { latitude: lat, longitude: lon } = pos.coords;
+          const res = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&accept-language=ar`,
+            { headers: { 'User-Agent': 'WashTech/2.0' } }
+          );
+          const data = await res.json();
+          const detected = data.address?.suburb || data.address?.neighbourhood || data.address?.quarter || data.address?.city_district || '';
+          const list = neighborhoods.length ? neighborhoods : tr.neighborhoods;
+          const match = list.find(n => detected.includes(n) || n.includes(detected));
+          if (match) {
+            set('neighborhood', match);
+          } else if (detected) {
+            setGpsError(lang === 'ar' ? `تم تحديد: ${detected} — اختر يدوياً` : `دۆزرایەوە: ${detected} — دەستی هەڵبژێرە`);
+          } else {
+            setGpsError(lang === 'ar' ? 'تعذّر تحديد المنطقة' : 'ناوچەکە نەدۆزرایەوە');
+          }
+        } catch {
+          setGpsError(lang === 'ar' ? 'خطأ في تحديد الموقع' : 'هەڵە لە دیاریکردنی شوێن');
+        }
+        setGpsLoading(false);
+      },
+      () => { setGpsError(lang === 'ar' ? 'رُفض الوصول للموقع' : 'مۆڵەتی شوێن ڕەتکرایەوە'); setGpsLoading(false); }
+    );
+  }
 
   const step1Valid = form.name.trim() && form.phone.trim().length >= 10;
   const step2Valid = form.neighborhood && form.carType && form.package;
@@ -159,6 +193,23 @@ export default function BookingPage() {
           {step === 2 && (
             <div className="space-y-4">
               <Field label={tr.neighborhood}>
+                <div className="flex gap-2 mb-2">
+                  <button
+                    type="button"
+                    onClick={detectLocation}
+                    disabled={gpsLoading}
+                    className="flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 disabled:opacity-50 text-slate-700 text-xs font-medium rounded-xl transition-colors"
+                  >
+                    {gpsLoading ? (
+                      <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                    ) : (
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                    )}
+                    {lang === 'ar' ? 'تحديد موقعي' : 'شوێنم دیاریبکە'}
+                  </button>
+                  {form.neighborhood && <span className="self-center text-xs text-green-600 font-medium">✓ {form.neighborhood}</span>}
+                </div>
+                {gpsError && <p className="text-xs text-amber-600 mb-2">{gpsError}</p>}
                 <select className={input} value={form.neighborhood} onChange={e => set('neighborhood', e.target.value)}>
                   <option value="">—</option>
                   {(neighborhoods.length ? neighborhoods : tr.neighborhoods).map(n => <option key={n} value={n}>{n}</option>)}
