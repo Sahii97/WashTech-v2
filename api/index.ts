@@ -110,7 +110,14 @@ const app = express();
 app.use(express.json());
 
 app.get('/api/health', (_req, res) => {
-  res.json({ status: 'ok', version: '2.1', n8n: !!N8N_WEBHOOK, wasender: !!WASENDER_TOKEN });
+  res.json({
+    status: 'ok',
+    version: '3.0',
+    wasenderToken: WASENDER_TOKEN ? `set (${WASENDER_TOKEN.slice(0,8)}...)` : 'NOT SET ⚠️',
+    managerPhone: MANAGER_PHONE,
+    n8nWebhook: N8N_WEBHOOK || 'not set (using WasenderAPI directly)',
+    mode: N8N_WEBHOOK ? 'n8n' : 'direct-whatsapp',
+  });
 });
 
 // ── Slots ─────────────────────────────────────────────────────
@@ -337,12 +344,18 @@ app.post('/api/admin/test-notification', async (req, res) => {
 app.post('/api/admin/test-all-notifications', async (req, res) => {
   const { testPhone } = req.body as { testPhone?: string };
   const to = testPhone || MANAGER_PHONE;
-  res.json({ success: true, message: 'Sending all 4 test notifications...', sentTo: to });
   const events: EventKey[] = ['new_booking', 'booking_approved', 'driver_accepted', 'booking_rejected'];
+  const results: string[] = [];
   for (const event of events) {
-    await notify(event, DUMMY_VARS[event](to), EVENT_RECIPIENTS[event](to));
-    await new Promise(r => setTimeout(r, 800));
+    try {
+      await notify(event, DUMMY_VARS[event](to), EVENT_RECIPIENTS[event](to));
+      results.push(`✓ ${event}`);
+    } catch (e) {
+      results.push(`✗ ${event}: ${e}`);
+    }
+    await new Promise(r => setTimeout(r, 600));
   }
+  res.json({ success: true, sentTo: to, results });
 });
 
 export default app;
