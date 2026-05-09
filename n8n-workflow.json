@@ -1,0 +1,198 @@
+{
+  "name": "WashTech — WhatsApp Notifications",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "washtech",
+        "options": {}
+      },
+      "id": "node-webhook",
+      "name": "WashTech Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "webhookId": "washtech"
+    },
+    {
+      "parameters": {
+        "dataType": "string",
+        "value1": "={{ $json.event }}",
+        "rules": {
+          "rules": [
+            { "value2": "new_booking",      "output": 0 },
+            { "value2": "booking_approved", "output": 1 },
+            { "value2": "driver_accepted",  "output": 2 },
+            { "value2": "booking_rejected", "output": 3 }
+          ]
+        },
+        "fallbackOutput": 4
+      },
+      "id": "node-switch",
+      "name": "Route by Event",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 1,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const d = $input.first().json;\nconst date = d.date === 'today' ? 'اليوم' : 'غداً';\nconst pkg = { basic: 'غسيل خارجي — 5,000 د.ع', full: 'غسيل كامل — 10,000 د.ع', premium: 'بريميوم — 20,000 د.ع' };\nconst car = { sedan: 'سيدان', suv: 'SUV', pickup: 'بيكأب', van: 'فان' };\nconst shortId = d.id ? d.id.slice(-5) : '-----';\n\nreturn [{\n  json: {\n    to: '+9647809471576',\n    text: `📦 حجز جديد #${shortId}\\n👤 ${d.name}\\n📞 ${d.phone}\\n📍 ${d.neighborhood}\\n🚗 ${car[d.carType] || d.carType} — ${pkg[d.package] || d.package}\\n🕐 ${date} ${d.slot}`\n  }\n}];"
+      },
+      "id": "node-code-new-booking",
+      "name": "Build Manager Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 80]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://wasenderapi.com/api/send-message",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer 19dba298c1792887bb4062c14221a46b9491b67eca898f93cc6a614990f31fa7" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "to",   "value": "={{ $json.to }}" },
+            { "name": "text", "value": "={{ $json.text }}" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "node-http-manager",
+      "name": "Notify Manager",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [900, 80]
+    },
+    {
+      "parameters": {
+        "jsCode": "const d = $input.first().json;\n\nreturn [{\n  json: {\n    to: d.driverPhone || '+9647809471576',\n    text: `✅ لديك حجز جديد\\n👤 ${d.name}\\n📞 ${d.phone}\\n📍 ${d.neighborhood}\\n🕐 ${d.slot}\\n\\nافتح تطبيق السائق واضغط قبول المهمة`\n  }\n}];"
+      },
+      "id": "node-code-approved",
+      "name": "Build Driver Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 240]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://wasenderapi.com/api/send-message",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer 19dba298c1792887bb4062c14221a46b9491b67eca898f93cc6a614990f31fa7" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "to",   "value": "={{ $json.to }}" },
+            { "name": "text", "value": "={{ $json.text }}" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "node-http-driver",
+      "name": "Notify Driver",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [900, 240]
+    },
+    {
+      "parameters": {
+        "jsCode": "const d = $input.first().json;\nconst isKu = d.language === 'ku';\n\nconst text = isKu\n  ? `🚗 شۆفێرەکەت لە ڕێگایە بۆ لات!\\n👨‍💼 شۆفێر: ${d.driverName}\\n🕐 کات: ${d.slot}\\nزوو دەگات. سوپاس بۆ هەڵبژاردنی WashTech! 🧼`\n  : `🚗 سائقك في الطريق إليك!\\n👨‍💼 السائق: ${d.driverName}\\n🕐 الوقت: ${d.slot}\\nسيصل قريباً. شكراً لاختيارك WashTech! 🧼`;\n\nreturn [{ json: { to: d.phone, text } }];"
+      },
+      "id": "node-code-driver-accepted",
+      "name": "Build On-Way Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 400]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://wasenderapi.com/api/send-message",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer 19dba298c1792887bb4062c14221a46b9491b67eca898f93cc6a614990f31fa7" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "to",   "value": "={{ $json.to }}" },
+            { "name": "text", "value": "={{ $json.text }}" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "node-http-customer-onway",
+      "name": "Notify Customer (On Way)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [900, 400]
+    },
+    {
+      "parameters": {
+        "jsCode": "const d = $input.first().json;\nconst isKu = d.language === 'ku';\n\nconst text = isKu\n  ? `❌ ببورە، نەتوانینم حجزەکەت لەم کاتەدا قبوڵ بکەین.\\nتکایە دووبارە هەوڵبدەرەوە یان کاتێکی تر هەڵبژێرە.\\nWashTech 🚗`\n  : `❌ عذراً، لم نتمكن من قبول حجزك في هذا الوقت.\\nيرجى المحاولة مرة أخرى أو اختيار وقت آخر.\\nWashTech 🚗`;\n\nreturn [{ json: { to: d.phone, text } }];"
+      },
+      "id": "node-code-rejected",
+      "name": "Build Rejection Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 560]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://wasenderapi.com/api/send-message",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer 19dba298c1792887bb4062c14221a46b9491b67eca898f93cc6a614990f31fa7" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "to",   "value": "={{ $json.to }}" },
+            { "name": "text", "value": "={{ $json.text }}" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "node-http-customer-rejected",
+      "name": "Notify Customer (Rejected)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [900, 560]
+    }
+  ],
+  "connections": {
+    "WashTech Webhook": {
+      "main": [[{ "node": "Route by Event", "type": "main", "index": 0 }]]
+    },
+    "Route by Event": {
+      "main": [
+        [{ "node": "Build Manager Message",  "type": "main", "index": 0 }],
+        [{ "node": "Build Driver Message",   "type": "main", "index": 0 }],
+        [{ "node": "Build On-Way Message",   "type": "main", "index": 0 }],
+        [{ "node": "Build Rejection Message","type": "main", "index": 0 }]
+      ]
+    },
+    "Build Manager Message":  { "main": [[{ "node": "Notify Manager",              "type": "main", "index": 0 }]] },
+    "Build Driver Message":   { "main": [[{ "node": "Notify Driver",               "type": "main", "index": 0 }]] },
+    "Build On-Way Message":   { "main": [[{ "node": "Notify Customer (On Way)",    "type": "main", "index": 0 }]] },
+    "Build Rejection Message":{ "main": [[{ "node": "Notify Customer (Rejected)",  "type": "main", "index": 0 }]] }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "tags": []
+}

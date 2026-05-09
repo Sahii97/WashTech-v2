@@ -34,7 +34,7 @@ export default function DriverView() {
   async function updateStatus(taskId: string, status: string) {
     await fetch('/api/driver/update-status', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ bookingId: taskId, status }),
+      body: JSON.stringify({ bookingId: taskId, status, driverId: driver?.id }),
     });
     if (driver) loadTasks(driver.id);
   }

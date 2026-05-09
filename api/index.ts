@@ -32,7 +32,7 @@ const DEFAULT_NEIGHBORHOODS = [
   'عنكاوة','عدن','آزادي','بحركة','ريزان','كويسنجق',
   'ولي','بناسلاوة','زرگوس','سامي عبدالرحمن','إسكان',
 ];
-const DEFAULT_DRIVERS = [{ id: 'd1', name: 'Ali', code: '1234' }];
+const DEFAULT_DRIVERS = [{ id: 'd1', name: 'Ali', code: '1234', phone: '+9647809471576' }];
 
 // ── Firestore helpers ─────────────────────────────────────────
 async function getSetting<T>(key: string, def: T): Promise<T> {
@@ -47,16 +47,15 @@ async function setSetting(key: string, value: any) {
 async function getDrivers() {
   const snap = await getDocs(collection(db, 'drivers'));
   if (snap.empty) {
-    // seed defaults on first run
     for (const d of DEFAULT_DRIVERS) {
-      await setDoc(doc(db, 'drivers', d.id), { name: d.name, code: d.code });
+      await setDoc(doc(db, 'drivers', d.id), { name: d.name, code: d.code, phone: d.phone });
     }
     return DEFAULT_DRIVERS;
   }
   return snap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
 }
 
-// ── WhatsApp ──────────────────────────────────────────────────
+// ── Notifications ─────────────────────────────────────────────
 async function sendWhatsApp(to: string, text: string): Promise<boolean> {
   if (!WASENDER_TOKEN) return false;
   try {
@@ -69,31 +68,50 @@ async function sendWhatsApp(to: string, text: string): Promise<boolean> {
   } catch { return false; }
 }
 
-// ── n8n webhook ───────────────────────────────────────────────
-async function triggerN8n(event: string, data: any) {
-  if (!N8N_WEBHOOK) return;
-  try {
-    await fetch(N8N_WEBHOOK, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ event, ...data }),
-    });
-  } catch (e) { console.error('[n8n]', e); }
+async function notify(event: string, data: any) {
+  if (N8N_WEBHOOK) {
+    // n8n handles all WhatsApp — send event and stop
+    try {
+      await fetch(N8N_WEBHOOK, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ event, ...data }),
+      });
+    } catch (e) { console.error('[n8n]', e); }
+  } else {
+    // Fallback: direct WhatsApp (no n8n configured)
+    if (event === 'new_booking') {
+      const d = data;
+      const msg = `📦 حجز جديد #${d.id?.slice(-5)}\n👤 ${d.name}\n📞 ${d.phone}\n📍 ${d.neighborhood}\n🚗 ${d.carType} — ${d.package}\n🕐 ${d.date === 'today' ? 'اليوم' : 'غداً'} ${d.slot}`;
+      sendWhatsApp(MANAGER_PHONE, msg).catch(console.error);
+    }
+    if (event === 'booking_approved') {
+      const d = data;
+      sendWhatsApp(d.driverPhone || MANAGER_PHONE, `✅ لديك حجز جديد\n👤 ${d.name}\n📍 ${d.neighborhood}\n🕐 ${d.slot}`).catch(console.error);
+      if (d.phone) sendWhatsApp(d.phone, `✅ تم تأكيد حجزك!\n🚗 السائق: ${d.driverName}\n🕐 ${d.slot}`).catch(console.error);
+    }
+    if (event === 'driver_accepted') {
+      const d = data;
+      if (d.phone) sendWhatsApp(d.phone, `🚗 سائقك في الطريق!\n👨‍💼 ${d.driverName}\n🕐 ${d.slot}`).catch(console.error);
+    }
+    if (event === 'booking_rejected') {
+      const d = data;
+      if (d.phone) sendWhatsApp(d.phone, `❌ عذراً، لم نتمكن من قبول حجزك. يرجى المحاولة مرة أخرى.`).catch(console.error);
+    }
+  }
 }
 
 // ── Express app ───────────────────────────────────────────────
 const app = express();
 app.use(express.json());
 
-// Health
 app.get('/api/health', (_req, res) => {
-  res.json({ status: 'ok', version: '2.1', wasender: !!WASENDER_TOKEN, n8n: !!N8N_WEBHOOK });
+  res.json({ status: 'ok', version: '2.1', n8n: !!N8N_WEBHOOK, wasender: !!WASENDER_TOKEN });
 });
 
 // ── Slots ─────────────────────────────────────────────────────
 app.get('/api/slots', async (_req, res) => {
-  const slots = await getSetting('slots', DEFAULT_SLOTS);
-  res.json({ slots });
+  res.json({ slots: await getSetting('slots', DEFAULT_SLOTS) });
 });
 app.post('/api/slots', async (req, res) => {
   const { slots } = req.body;
@@ -104,8 +122,7 @@ app.post('/api/slots', async (req, res) => {
 
 // ── Neighborhoods ─────────────────────────────────────────────
 app.get('/api/neighborhoods', async (_req, res) => {
-  const neighborhoods = await getSetting('neighborhoods', DEFAULT_NEIGHBORHOODS);
-  res.json({ neighborhoods });
+  res.json({ neighborhoods: await getSetting('neighborhoods', DEFAULT_NEIGHBORHOODS) });
 });
 app.post('/api/admin/neighborhoods', async (req, res) => {
   const { name } = req.body;
@@ -125,15 +142,14 @@ app.delete('/api/admin/neighborhoods/:name', async (req, res) => {
 
 // ── Drivers ───────────────────────────────────────────────────
 app.get('/api/drivers', async (_req, res) => {
-  const drivers = await getDrivers();
-  res.json({ drivers });
+  res.json({ drivers: await getDrivers() });
 });
 app.post('/api/admin/create-driver', async (req, res) => {
-  const { name, code } = req.body;
+  const { name, code, phone } = req.body;
   if (!name || !code) return res.status(400).json({ error: 'Name and code required' });
   const id = `d${Date.now()}`;
-  await setDoc(doc(db, 'drivers', id), { name, code });
-  res.json({ success: true, driver: { id, name, code } });
+  await setDoc(doc(db, 'drivers', id), { name, code, phone: phone || '' });
+  res.json({ success: true, driver: { id, name, code, phone: phone || '' } });
 });
 app.delete('/api/admin/driver/:id', async (req, res) => {
   await deleteDoc(doc(db, 'drivers', req.params.id));
@@ -146,16 +162,7 @@ app.post('/api/bookings', async (req, res) => {
     const booking = { ...req.body, status: 'pending', createdAt: new Date().toISOString() };
     const docRef = await addDoc(collection(db, 'bookings'), booking);
     const id = docRef.id;
-
-    const msg =
-      `📦 حجز جديد #${id.slice(-5)}\n` +
-      `👤 ${booking.name}\n📞 ${booking.phone}\n📍 ${booking.neighborhood}\n` +
-      `🚗 ${booking.carType} — ${booking.package}\n` +
-      `🕐 ${booking.date === 'today' ? 'اليوم' : 'غداً'} ${booking.slot}`;
-
-    sendWhatsApp(MANAGER_PHONE, msg).catch(console.error);
-    triggerN8n('new_booking', { id, ...booking }).catch(console.error);
-
+    notify('new_booking', { id, ...booking }).catch(console.error);
     res.json({ success: true, id });
   } catch (e) {
     console.error('[booking]', e);
@@ -196,31 +203,17 @@ app.post('/api/manager/action', async (req, res) => {
 
     if (action === 'approve') {
       await updateDoc(bookingRef, { status: 'approved', driverId, updatedAt: new Date().toISOString() });
-
-      // Get driver name
       const driverDoc = await getDoc(doc(db, 'drivers', driverId));
-      const driverName = driverDoc.exists() ? (driverDoc.data() as any).name : 'السائق';
-
-      sendWhatsApp(MANAGER_PHONE,
-        `✅ تم تعيين ${driverName} على حجز جديد\n👤 ${booking?.name}\n📍 ${booking?.neighborhood}\n🕐 ${booking?.slot}`
-      ).catch(console.error);
-
-      if (booking?.phone) {
-        sendWhatsApp(booking.phone,
-          `✅ تم تأكيد حجزك في WashTech!\n🚗 السائق: ${driverName}\n🕐 ${booking?.slot}\nسيتواصل معك السائق قريباً.`
-        ).catch(console.error);
-      }
-
-      triggerN8n('booking_approved', { bookingId, driverId, driverName, ...booking }).catch(console.error);
+      const driver = driverDoc.exists() ? (driverDoc.data() as any) : { name: 'السائق', phone: '' };
+      notify('booking_approved', {
+        bookingId, driverId,
+        driverName: driver.name, driverPhone: driver.phone,
+        ...booking,
+      }).catch(console.error);
 
     } else if (action === 'reject') {
       await updateDoc(bookingRef, { status: 'rejected', updatedAt: new Date().toISOString() });
-      if (booking?.phone) {
-        sendWhatsApp(booking.phone,
-          `❌ عذراً، لم يتم قبول حجزك في هذا الوقت. يرجى المحاولة مرة أخرى.`
-        ).catch(console.error);
-      }
-      triggerN8n('booking_rejected', { bookingId, ...booking }).catch(console.error);
+      notify('booking_rejected', { bookingId, ...booking }).catch(console.error);
     }
 
     res.json({ success: true });
@@ -251,9 +244,25 @@ app.get('/api/driver/tasks', async (req, res) => {
 });
 
 app.post('/api/driver/update-status', async (req, res) => {
-  const { bookingId, status } = req.body;
+  const { bookingId, status, driverId } = req.body;
   try {
     await updateDoc(doc(db, 'bookings', bookingId), { status, updatedAt: new Date().toISOString() });
+
+    // When driver accepts → notify customer
+    if (status === 'on_process' && driverId) {
+      const snap = await getDocs(collection(db, 'bookings'));
+      const booking = snap.docs.find(d => d.id === bookingId)?.data() as any;
+      const driverDoc = await getDoc(doc(db, 'drivers', driverId));
+      const driver = driverDoc.exists() ? (driverDoc.data() as any) : { name: 'السائق' };
+      notify('driver_accepted', {
+        bookingId,
+        driverName: driver.name,
+        phone: booking?.phone,
+        slot: booking?.slot,
+        language: booking?.language,
+      }).catch(console.error);
+    }
+
     res.json({ success: true });
   } catch { res.status(500).json({ error: 'Failed' }); }
 });
@@ -261,19 +270,17 @@ app.post('/api/driver/update-status', async (req, res) => {
 // ── Admin Reset ───────────────────────────────────────────────
 app.post('/api/admin/reset', async (req, res) => {
   try {
-    const snap = await getDocs(collection(db, 'bookings'));
-    await Promise.all(snap.docs.map(d => deleteDoc(doc(db, 'bookings', d.id))));
+    const bookSnap = await getDocs(collection(db, 'bookings'));
+    await Promise.all(bookSnap.docs.map(d => deleteDoc(doc(db, 'bookings', d.id))));
     const driverSnap = await getDocs(collection(db, 'drivers'));
     await Promise.all(driverSnap.docs.map(d => deleteDoc(doc(db, 'drivers', d.id))));
     for (const d of DEFAULT_DRIVERS) {
-      await setDoc(doc(db, 'drivers', d.id), { name: d.name, code: d.code });
+      await setDoc(doc(db, 'drivers', d.id), { name: d.name, code: d.code, phone: d.phone });
     }
     await setSetting('slots', DEFAULT_SLOTS);
     await setSetting('neighborhoods', DEFAULT_NEIGHBORHOODS);
     res.json({ success: true });
-  } catch (e) {
-    res.status(500).json({ error: 'Reset failed' });
-  }
+  } catch { res.status(500).json({ error: 'Reset failed' }); }
 });
 
 export default app;

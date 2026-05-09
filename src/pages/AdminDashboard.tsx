@@ -4,7 +4,7 @@ type Driver = { id: string; name: string; code: string };
 
 export default function AdminDashboard() {
   const [drivers, setDrivers] = useState<Driver[]>([]);
-  const [newDriver, setNewDriver] = useState({ name: '', code: '' });
+  const [newDriver, setNewDriver] = useState({ name: '', code: '', phone: '' });
   const [bookingCount, setBookingCount] = useState(0);
   const [status, setStatus] = useState('');
   const [resetting, setResetting] = useState(false);
@@ -35,7 +35,7 @@ export default function AdminDashboard() {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(newDriver),
     });
-    if (res.ok) { setNewDriver({ name: '', code: '' }); setStatus('Driver created ✓'); load(); }
+    if (res.ok) { setNewDriver({ name: '', code: '', phone: '' }); setStatus('Driver created ✓'); load(); }
     setTimeout(() => setStatus(''), 2000);
   }
 
@@ -101,25 +101,36 @@ export default function AdminDashboard() {
         {/* Driver management */}
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
           <h2 className="font-bold text-slate-900 mb-4 text-sm uppercase tracking-wider">Driver Management</h2>
-          <form onSubmit={createDriver} className="flex gap-2 mb-4">
-            <input
-              placeholder="Name"
-              className="flex-1 px-3 py-2 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-              value={newDriver.name}
-              onChange={e => setNewDriver(p => ({ ...p, name: e.target.value }))}
-              required
-            />
-            <input
-              placeholder="Code"
-              maxLength={4}
-              className="w-20 px-3 py-2 border border-slate-300 rounded-xl text-sm font-mono text-center focus:outline-none focus:ring-2 focus:ring-brand-500"
-              value={newDriver.code}
-              onChange={e => setNewDriver(p => ({ ...p, code: e.target.value.replace(/\D/g, '') }))}
-              required
-            />
-            <button type="submit" className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white font-semibold rounded-xl text-sm transition-colors">
-              Add
-            </button>
+          <form onSubmit={createDriver} className="space-y-2 mb-4">
+            <div className="flex gap-2">
+              <input
+                placeholder="Name"
+                className="flex-1 px-3 py-2 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                value={newDriver.name}
+                onChange={e => setNewDriver(p => ({ ...p, name: e.target.value }))}
+                required
+              />
+              <input
+                placeholder="Code"
+                maxLength={4}
+                className="w-20 px-3 py-2 border border-slate-300 rounded-xl text-sm font-mono text-center focus:outline-none focus:ring-2 focus:ring-brand-500"
+                value={newDriver.code}
+                onChange={e => setNewDriver(p => ({ ...p, code: e.target.value.replace(/\D/g, '') }))}
+                required
+              />
+            </div>
+            <div className="flex gap-2">
+              <input
+                placeholder="WhatsApp +9647xxxxxxxxx"
+                type="tel"
+                className="flex-1 px-3 py-2 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                value={newDriver.phone}
+                onChange={e => setNewDriver(p => ({ ...p, phone: e.target.value }))}
+              />
+              <button type="submit" className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white font-semibold rounded-xl text-sm transition-colors">
+                Add
+              </button>
+            </div>
           </form>
           {status && <p className="text-green-600 text-sm mb-3">{status}</p>}
           <div className="space-y-2">
@@ -127,7 +138,7 @@ export default function AdminDashboard() {
               <div key={d.id} className="flex items-center justify-between bg-slate-50 rounded-xl px-4 py-3">
                 <div>
                   <p className="font-medium text-slate-900 text-sm">{d.name}</p>
-                  <p className="text-xs text-slate-400 font-mono">Code: {d.code}</p>
+                  <p className="text-xs text-slate-400 font-mono">Code: {d.code}{d.phone ? ` · ${d.phone}` : ''}</p>
                 </div>
                 <button onClick={() => deleteDriver(d.id)} className="text-red-400 hover:text-red-600 text-sm transition-colors">
                   Remove
