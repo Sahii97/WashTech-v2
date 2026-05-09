@@ -9,18 +9,23 @@ export default function AdminDashboard() {
   const [status, setStatus] = useState('');
   const [resetting, setResetting] = useState(false);
   const [slots, setSlots] = useState<string[]>([]);
+  const [neighborhoods, setNeighborhoods] = useState<string[]>([]);
+  const [newNeighborhood, setNewNeighborhood] = useState('');
+  const [neighborhoodStatus, setNeighborhoodStatus] = useState('');
 
   useEffect(() => { load(); }, []);
 
   async function load() {
-    const [d, b, s] = await Promise.all([
+    const [d, b, s, n] = await Promise.all([
       fetch('/api/drivers').then(r => r.json()),
       fetch('/api/bookings').then(r => r.json()),
       fetch('/api/slots').then(r => r.json()),
+      fetch('/api/neighborhoods').then(r => r.json()),
     ]);
     setDrivers(d.drivers || []);
     setBookingCount((b.bookings || []).length);
     setSlots(s.slots || []);
+    setNeighborhoods(n.neighborhoods || []);
   }
 
   async function createDriver(e: React.FormEvent) {
@@ -36,6 +41,23 @@ export default function AdminDashboard() {
 
   async function deleteDriver(id: string) {
     await fetch(`/api/admin/driver/${id}`, { method: 'DELETE' });
+    load();
+  }
+
+  async function addNeighborhood(e: React.FormEvent) {
+    e.preventDefault();
+    if (!newNeighborhood.trim()) return;
+    const res = await fetch('/api/admin/neighborhoods', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: newNeighborhood.trim() }),
+    });
+    if (res.ok) { setNewNeighborhood(''); setNeighborhoodStatus('Added ✓'); load(); }
+    else { const d = await res.json(); setNeighborhoodStatus(d.error || 'Error'); }
+    setTimeout(() => setNeighborhoodStatus(''), 2000);
+  }
+
+  async function deleteNeighborhood(name: string) {
+    await fetch(`/api/admin/neighborhoods/${encodeURIComponent(name)}`, { method: 'DELETE' });
     load();
   }
 
@@ -64,6 +86,7 @@ export default function AdminDashboard() {
             <Stat label="Total Bookings" value={bookingCount} />
             <Stat label="Active Drivers" value={drivers.length} />
             <Stat label="Available Slots" value={slots.length} />
+            <Stat label="Neighborhoods" value={neighborhoods.length} />
             <Stat label="WhatsApp (WasenderAPI)" value="Connected" />
           </div>
           <button
@@ -106,16 +129,46 @@ export default function AdminDashboard() {
                   <p className="font-medium text-slate-900 text-sm">{d.name}</p>
                   <p className="text-xs text-slate-400 font-mono">Code: {d.code}</p>
                 </div>
-                <button
-                  onClick={() => deleteDriver(d.id)}
-                  className="text-red-400 hover:text-red-600 text-sm transition-colors"
-                >
+                <button onClick={() => deleteDriver(d.id)} className="text-red-400 hover:text-red-600 text-sm transition-colors">
                   Remove
                 </button>
               </div>
             ))}
           </div>
         </div>
+
+        {/* Neighborhood management */}
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 lg:col-span-2">
+          <h2 className="font-bold text-slate-900 mb-4 text-sm uppercase tracking-wider">Location Management — المناطق</h2>
+          <form onSubmit={addNeighborhood} className="flex gap-2 mb-4">
+            <input
+              placeholder="اسم المنطقة / Add neighborhood"
+              className="flex-1 px-3 py-2 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+              value={newNeighborhood}
+              onChange={e => setNewNeighborhood(e.target.value)}
+              required
+            />
+            <button type="submit" className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white font-semibold rounded-xl text-sm transition-colors">
+              Add
+            </button>
+          </form>
+          {neighborhoodStatus && (
+            <p className={`text-sm mb-3 ${neighborhoodStatus.includes('✓') ? 'text-green-600' : 'text-red-500'}`}>
+              {neighborhoodStatus}
+            </p>
+          )}
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+            {neighborhoods.map(n => (
+              <div key={n} className="flex items-center justify-between bg-slate-50 rounded-xl px-3 py-2">
+                <span className="text-sm text-slate-700 truncate">{n}</span>
+                <button onClick={() => deleteNeighborhood(n)} className="text-red-400 hover:text-red-600 text-xs ml-2 flex-shrink-0 transition-colors">
+                  ✕
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+
       </div>
     </div>
   );

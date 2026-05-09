@@ -50,6 +50,9 @@ let availableSlots: string[] = [
 let availableDrivers: { id: string; name: string; code: string }[] = [
   { id: 'd1', name: 'Ali', code: '1234' },
 ];
+let availableNeighborhoods: string[] = [
+  'عنكاوة','عدن','آزادي','بحركة','ريزان','كويسنجق','ولي','بناسلاوة','زرگوس','سامي عبدالرحمن','إسكان',
+];
 
 // ── API ───────────────────────────────────────────────────────
 
@@ -68,6 +71,21 @@ app.post('/api/slots', (req, res) => {
 
 // Drivers
 app.get('/api/drivers', (_req, res) => res.json({ drivers: availableDrivers }));
+
+// Neighborhoods
+app.get('/api/neighborhoods', (_req, res) => res.json({ neighborhoods: availableNeighborhoods }));
+app.post('/api/admin/neighborhoods', (req, res) => {
+  const { name } = req.body;
+  if (!name?.trim()) return res.status(400).json({ error: 'Name required' });
+  if (availableNeighborhoods.includes(name.trim())) return res.status(400).json({ error: 'Already exists' });
+  availableNeighborhoods.push(name.trim());
+  res.json({ success: true, neighborhoods: availableNeighborhoods });
+});
+app.delete('/api/admin/neighborhoods/:name', (req, res) => {
+  const name = decodeURIComponent(req.params.name);
+  availableNeighborhoods = availableNeighborhoods.filter(n => n !== name);
+  res.json({ success: true });
+});
 
 // ── Bookings ──────────────────────────────────────────────────
 
@@ -229,6 +247,9 @@ app.post('/api/admin/reset', async (req, res) => {
     const snap = await getDocs(collection(db, 'bookings'));
     await Promise.all(snap.docs.map(d => deleteDoc(doc(db, 'bookings', d.id))));
     availableDrivers = [{ id: 'd1', name: 'Ali', code: '1234' }];
+    availableNeighborhoods = [
+      'عنكاوة','عدن','آزادي','بحركة','ريزان','كويسنجق','ولي','بناسلاوة','زرگوس','سامي عبدالرحمن','إسكان',
+    ];
     availableSlots = [
       '09:00 AM','10:00 AM','11:00 AM','12:00 PM','01:00 PM',
       '02:00 PM','03:00 PM','04:00 PM','05:00 PM','06:00 PM',

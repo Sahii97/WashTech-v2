@@ -14,6 +14,7 @@ export default function BookingPage() {
   const [bookingId, setBookingId] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [slots, setSlots] = useState<string[]>([]);
+  const [neighborhoods, setNeighborhoods] = useState<string[]>([]);
   const [trackId, setTrackId] = useState('');
   const [trackResult, setTrackResult] = useState<any>(null);
 
@@ -24,6 +25,7 @@ export default function BookingPage() {
 
   useEffect(() => {
     fetch('/api/slots').then(r => r.json()).then(d => setSlots(d.slots || []));
+    fetch('/api/neighborhoods').then(r => r.json()).then(d => setNeighborhoods(d.neighborhoods || []));
   }, []);
 
   const set = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }));
@@ -159,7 +161,7 @@ export default function BookingPage() {
               <Field label={tr.neighborhood}>
                 <select className={input} value={form.neighborhood} onChange={e => set('neighborhood', e.target.value)}>
                   <option value="">—</option>
-                  {tr.neighborhoods.map(n => <option key={n} value={n}>{n}</option>)}
+                  {(neighborhoods.length ? neighborhoods : tr.neighborhoods).map(n => <option key={n} value={n}>{n}</option>)}
                 </select>
               </Field>
               <Field label={tr.carType}>
