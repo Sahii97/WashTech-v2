@@ -55,50 +55,54 @@ async function getDrivers() {
   return snap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
 }
 
+// ── Notification templates ────────────────────────────────────
+export type EventKey = 'new_booking' | 'booking_approved' | 'driver_accepted' | 'booking_rejected';
+export interface TemplateConfig { enabled: boolean; template: string; }
+export type NotificationTemplates = Record<EventKey, TemplateConfig>;
+
+const DEFAULT_TEMPLATES: NotificationTemplates = {
+  new_booking:      { enabled: true, template: '📦 حجز جديد #{{id}}\n👤 {{name}}\n📞 {{phone}}\n📍 {{neighborhood}}\n🚗 {{carType}} — {{package}}\n🕐 {{date}} {{slot}}' },
+  booking_approved: { enabled: true, template: '✅ لديك حجز جديد\n👤 {{name}}\n📞 {{phone}}\n📍 {{neighborhood}}\n🕐 {{slot}}\n\nافتح تطبيق السائق واضغط قبول المهمة' },
+  driver_accepted:  { enabled: true, template: '🚗 سائقك في الطريق إليك!\n👨‍💼 السائق: {{driverName}}\n🕐 الوقت: {{slot}}\nسيصل قريباً. شكراً لاختيارك WashTech! 🧼' },
+  booking_rejected: { enabled: true, template: '❌ عذراً، لم نتمكن من قبول حجزك في هذا الوقت.\nيرجى المحاولة مرة أخرى أو اختيار وقت آخر.\nWashTech 🚗' },
+};
+
+function applyTemplate(template: string, vars: Record<string, string>): string {
+  return template.replace(/\{\{(\w+)\}\}/g, (_, k) => vars[k] ?? `{{${k}}}`);
+}
+
+async function getTemplates(): Promise<NotificationTemplates> {
+  return getSetting<NotificationTemplates>('notification_templates', DEFAULT_TEMPLATES);
+}
+
 // ── Notifications ─────────────────────────────────────────────
-async function sendWhatsApp(to: string, text: string): Promise<boolean> {
-  if (!WASENDER_TOKEN) return false;
+async function sendWhatsApp(to: string, text: string): Promise<void> {
+  if (!WASENDER_TOKEN) { console.warn('[WhatsApp] No WASENDER_API_TOKEN'); return; }
   try {
     const res = await fetch('https://wasenderapi.com/api/send-message', {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${WASENDER_TOKEN}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ to, text }),
     });
-    return res.ok;
-  } catch { return false; }
+    if (!res.ok) console.error('[WhatsApp]', res.status, await res.text());
+  } catch (e) { console.error('[WhatsApp]', e); }
 }
 
-async function notify(event: string, data: any) {
+async function notify(event: EventKey, vars: Record<string, string>, to: string): Promise<void> {
   if (N8N_WEBHOOK) {
-    // n8n handles all WhatsApp — send event and stop
     try {
       await fetch(N8N_WEBHOOK, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ event, ...data }),
+        body: JSON.stringify({ event, ...vars }),
       });
     } catch (e) { console.error('[n8n]', e); }
-  } else {
-    // Fallback: direct WhatsApp (no n8n configured)
-    if (event === 'new_booking') {
-      const d = data;
-      const msg = `📦 حجز جديد #${d.id?.slice(-5)}\n👤 ${d.name}\n📞 ${d.phone}\n📍 ${d.neighborhood}\n🚗 ${d.carType} — ${d.package}\n🕐 ${d.date === 'today' ? 'اليوم' : 'غداً'} ${d.slot}`;
-      sendWhatsApp(MANAGER_PHONE, msg).catch(console.error);
-    }
-    if (event === 'booking_approved') {
-      const d = data;
-      sendWhatsApp(d.driverPhone || MANAGER_PHONE, `✅ لديك حجز جديد\n👤 ${d.name}\n📍 ${d.neighborhood}\n🕐 ${d.slot}`).catch(console.error);
-      if (d.phone) sendWhatsApp(d.phone, `✅ تم تأكيد حجزك!\n🚗 السائق: ${d.driverName}\n🕐 ${d.slot}`).catch(console.error);
-    }
-    if (event === 'driver_accepted') {
-      const d = data;
-      if (d.phone) sendWhatsApp(d.phone, `🚗 سائقك في الطريق!\n👨‍💼 ${d.driverName}\n🕐 ${d.slot}`).catch(console.error);
-    }
-    if (event === 'booking_rejected') {
-      const d = data;
-      if (d.phone) sendWhatsApp(d.phone, `❌ عذراً، لم نتمكن من قبول حجزك. يرجى المحاولة مرة أخرى.`).catch(console.error);
-    }
+    return;
   }
+  const templates = await getTemplates();
+  const cfg = templates[event];
+  if (!cfg?.enabled) return;
+  await sendWhatsApp(to, applyTemplate(cfg.template, vars));
 }
 
 // ── Express app ───────────────────────────────────────────────
@@ -162,7 +166,13 @@ app.post('/api/bookings', async (req, res) => {
     const booking = { ...req.body, status: 'pending', createdAt: new Date().toISOString() };
     const docRef = await addDoc(collection(db, 'bookings'), booking);
     const id = docRef.id;
-    notify('new_booking', { id, ...booking }).catch(console.error);
+    notify('new_booking', {
+      id: id.slice(-5), name: booking.name || '', phone: booking.phone || '',
+      neighborhood: booking.neighborhood || '', carType: booking.carType || '',
+      package: booking.package || '',
+      date: booking.date === 'today' ? 'اليوم' : 'غداً',
+      slot: booking.slot || '',
+    }, MANAGER_PHONE).catch(console.error);
     res.json({ success: true, id });
   } catch (e) {
     console.error('[booking]', e);
@@ -206,14 +216,16 @@ app.post('/api/manager/action', async (req, res) => {
       const driverDoc = await getDoc(doc(db, 'drivers', driverId));
       const driver = driverDoc.exists() ? (driverDoc.data() as any) : { name: 'السائق', phone: '' };
       notify('booking_approved', {
-        bookingId, driverId,
-        driverName: driver.name, driverPhone: driver.phone,
-        ...booking,
-      }).catch(console.error);
+        name: booking?.name || '', phone: booking?.phone || '',
+        neighborhood: booking?.neighborhood || '', slot: booking?.slot || '',
+        driverName: driver.name, driverPhone: driver.phone || '',
+      }, driver.phone || MANAGER_PHONE).catch(console.error);
 
     } else if (action === 'reject') {
       await updateDoc(bookingRef, { status: 'rejected', updatedAt: new Date().toISOString() });
-      notify('booking_rejected', { bookingId, ...booking }).catch(console.error);
+      notify('booking_rejected', {
+        name: booking?.name || '', phone: booking?.phone || '',
+      }, booking?.phone || '').catch(console.error);
     }
 
     res.json({ success: true });
@@ -255,12 +267,9 @@ app.post('/api/driver/update-status', async (req, res) => {
       const driverDoc = await getDoc(doc(db, 'drivers', driverId));
       const driver = driverDoc.exists() ? (driverDoc.data() as any) : { name: 'السائق' };
       notify('driver_accepted', {
-        bookingId,
-        driverName: driver.name,
-        phone: booking?.phone,
-        slot: booking?.slot,
-        language: booking?.language,
-      }).catch(console.error);
+        name: booking?.name || '', phone: booking?.phone || '',
+        driverName: driver.name, slot: booking?.slot || '',
+      }, booking?.phone || '').catch(console.error);
     }
 
     res.json({ success: true });
@@ -281,6 +290,59 @@ app.post('/api/admin/reset', async (req, res) => {
     await setSetting('neighborhoods', DEFAULT_NEIGHBORHOODS);
     res.json({ success: true });
   } catch { res.status(500).json({ error: 'Reset failed' }); }
+});
+
+// ── Notification templates API ────────────────────────────────
+app.get('/api/admin/notification-templates', async (_req, res) => {
+  res.json({ templates: await getTemplates() });
+});
+
+app.post('/api/admin/notification-templates', async (req, res) => {
+  const { templates } = req.body;
+  if (!templates) return res.status(400).json({ error: 'Missing templates' });
+  await setSetting('notification_templates', templates);
+  res.json({ success: true });
+});
+
+// ── Test notifications ────────────────────────────────────────
+const DUMMY_VARS: Record<EventKey, (to: string) => Record<string, string>> = {
+  new_booking:      to => ({ id: 'TEST1', name: 'محمد أحمد', phone: to, neighborhood: 'عنكاوة', carType: 'سيدان', package: 'غسيل كامل', date: 'اليوم', slot: '10:00 AM' }),
+  booking_approved: to => ({ name: 'محمد أحمد', phone: to, neighborhood: 'عنكاوة', slot: '10:00 AM', driverName: 'علي', driverPhone: to }),
+  driver_accepted:  to => ({ name: 'محمد أحمد', phone: to, driverName: 'علي', slot: '10:00 AM' }),
+  booking_rejected: to => ({ name: 'محمد أحمد', phone: to }),
+};
+
+const EVENT_RECIPIENTS: Record<EventKey, (to: string) => string> = {
+  new_booking:      _ => MANAGER_PHONE,
+  booking_approved: to => to,
+  driver_accepted:  to => to,
+  booking_rejected: to => to,
+};
+
+app.post('/api/admin/test-notification', async (req, res) => {
+  const { event, testPhone } = req.body as { event: EventKey; testPhone?: string };
+  if (!event) return res.status(400).json({ error: 'Missing event' });
+  const to = testPhone || MANAGER_PHONE;
+  try {
+    const vars = DUMMY_VARS[event](to);
+    const templates = await getTemplates();
+    const preview = templates[event]?.enabled ? applyTemplate(templates[event].template, vars) : '(disabled)';
+    await notify(event, vars, EVENT_RECIPIENTS[event](to));
+    res.json({ success: true, sentTo: EVENT_RECIPIENTS[event](to), preview });
+  } catch (e) {
+    res.status(500).json({ error: 'Failed' });
+  }
+});
+
+app.post('/api/admin/test-all-notifications', async (req, res) => {
+  const { testPhone } = req.body as { testPhone?: string };
+  const to = testPhone || MANAGER_PHONE;
+  res.json({ success: true, message: 'Sending all 4 test notifications...', sentTo: to });
+  const events: EventKey[] = ['new_booking', 'booking_approved', 'driver_accepted', 'booking_rejected'];
+  for (const event of events) {
+    await notify(event, DUMMY_VARS[event](to), EVENT_RECIPIENTS[event](to));
+    await new Promise(r => setTimeout(r, 800));
+  }
 });
 
 export default app;
