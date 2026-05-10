@@ -15,65 +15,29 @@ export default function ActionPage() {
   const id  = params.get('id')  || '';
   const act = (params.get('act') || '') as Act;
 
-  // ── Auth gate ─────────────────────────────────────────────
-  const [authed,    setAuthed]    = useState(false);
-  const [authName,  setAuthName]  = useState('');
-  const [authUser,  setAuthUser]  = useState('');
-  const [authPass,  setAuthPass]  = useState('');
-  const [authError, setAuthError] = useState('');
-  const [authing,   setAuthing]   = useState(false);
-
-  async function authenticate() {
-    if (!authPass.trim()) return;
-    setAuthing(true);
-    setAuthError('');
-    try {
-      if (act === 'accept') {
-        const res = await fetch('/api/driver/login', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ code: authPass.trim() }),
-        });
-        const data = await res.json();
-        if (res.ok) { setAuthName(data.driver?.name || 'السائق'); setAuthed(true); }
-        else setAuthError('كود السائق غير صحيح');
-      } else {
-        const res = await fetch('/api/manager/login', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username: authUser.trim(), password: authPass }),
-        });
-        const data = await res.json();
-        if (res.ok) { setAuthName(data.manager?.name || 'المدير'); setAuthed(true); }
-        else setAuthError(data.error || 'بيانات الدخول غير صحيحة');
-      }
-    } catch { setAuthError('خطأ في الاتصال، حاول مرة أخرى'); }
-    setAuthing(false);
-  }
-
-  // ── Booking & action ──────────────────────────────────────
   const [booking,    setBooking]    = useState<any>(null);
   const [drivers,    setDrivers]    = useState<any[]>([]);
   const [driverId,   setDriverId]   = useState('');
-  const [loading,    setLoading]    = useState(false);
+  const [loading,    setLoading]    = useState(true);
   const [done,       setDone]       = useState(false);
   const [result,     setResult]     = useState('');
-  const [fetchError, setFetchError] = useState('');
+  const [error,      setError]      = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    if (!authed || !id) return;
-    setLoading(true);
+    if (!id) { setError('رابط غير صالح'); setLoading(false); return; }
     Promise.all([
       fetch(`/api/action?id=${id}`).then(r => r.json()),
       act === 'approve' ? fetch('/api/drivers').then(r => r.json()) : Promise.resolve({ drivers: [] }),
     ]).then(([bData, dData]) => {
-      if (bData.error) { setFetchError(bData.error); setLoading(false); return; }
+      if (bData.error) { setError(bData.error); setLoading(false); return; }
       setBooking(bData.booking);
       const list = dData.drivers || [];
       setDrivers(list);
       if (list.length) setDriverId(list[0].id);
       setLoading(false);
-    }).catch(() => { setFetchError('فشل تحميل بيانات الحجز'); setLoading(false); });
-  }, [authed, id]);
+    }).catch(() => { setError('فشل تحميل بيانات الحجز'); setLoading(false); });
+  }, [id]);
 
   async function submit() {
     setSubmitting(true);
@@ -85,106 +49,32 @@ export default function ActionPage() {
       });
       const data = await res.json();
       if (data.success) { setDone(true); setResult(data.message); }
-      else setFetchError(data.error || 'حدث خطأ');
-    } catch { setFetchError('خطأ في الاتصال'); }
+      else setError(data.error || 'حدث خطأ');
+    } catch { setError('خطأ في الاتصال'); }
     setSubmitting(false);
   }
 
-  const actionConfig: Record<string, { title: string; btn: string; color: string }> = {
-    approve: { title: 'قبول الحجز',   btn: 'قبول وإرسال للسائق',       color: 'bg-green-600 hover:bg-green-700' },
-    reject:  { title: 'رفض الحجز',    btn: 'رفض وإشعار العميل',         color: 'bg-red-500  hover:bg-red-600'   },
-    accept:  { title: 'قبول المهمة',  btn: 'قبول المهمة وإشعار العميل', color: 'bg-blue-600 hover:bg-blue-700'  },
+  const cfg: Record<string, { title: string; btn: string; color: string; icon: string }> = {
+    approve: { title: 'قبول الحجز',   btn: 'قبول وإرسال للسائق',        color: 'bg-green-600 hover:bg-green-700', icon: '✅' },
+    reject:  { title: 'رفض الحجز',    btn: 'رفض وإشعار العميل',          color: 'bg-red-500  hover:bg-red-600',   icon: '❌' },
+    accept:  { title: 'قبول المهمة',  btn: 'قبول المهمة وإشعار العميل',  color: 'bg-blue-600 hover:bg-blue-700',  icon: '▶️' },
   };
-  const cfg = actionConfig[act];
+  const c = cfg[act];
 
-  const card = 'bg-white rounded-2xl shadow-sm border border-slate-200 p-6 max-w-md w-full';
-  const inp  = 'w-full px-4 py-3 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500';
-
-  // ── Auth screen ───────────────────────────────────────────
-  if (!authed) {
-    return (
-      <div dir="rtl" className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-        <div className={card}>
-          <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 bg-brand-50 rounded-full flex items-center justify-center text-xl">🚗</div>
-            <div>
-              <p className="font-bold text-slate-900">WashTech</p>
-              <p className="text-sm text-slate-500">
-                {act === 'accept' ? 'تسجيل دخول السائق' : 'تسجيل دخول المدير'}
-              </p>
-            </div>
-          </div>
-
-          {!id && (
-            <div className="text-center py-6 text-red-500">
-              <div className="text-3xl mb-2">⚠️</div>
-              <p>رابط غير صالح</p>
-            </div>
-          )}
-
-          {id && (
-            <>
-              <p className="text-sm text-slate-600 mb-4">
-                {act === 'accept'
-                  ? 'أدخل كود السائق للمتابعة وقبول المهمة'
-                  : 'أدخل بيانات حساب المدير للمتابعة'}
-              </p>
-
-              <div className="space-y-3">
-                {act !== 'accept' && (
-                  <input
-                    className={inp}
-                    placeholder="اسم المستخدم"
-                    value={authUser}
-                    onChange={e => setAuthUser(e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && authenticate()}
-                    dir="ltr"
-                    autoComplete="username"
-                  />
-                )}
-                <input
-                  className={inp}
-                  type={act === 'accept' ? 'text' : 'password'}
-                  placeholder={act === 'accept' ? 'كود السائق (4 أرقام)' : 'كلمة المرور'}
-                  value={authPass}
-                  onChange={e => setAuthPass(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && authenticate()}
-                  dir="ltr"
-                  autoComplete={act === 'accept' ? 'off' : 'current-password'}
-                  inputMode={act === 'accept' ? 'numeric' : undefined}
-                />
-              </div>
-
-              {authError && (
-                <p className="mt-3 text-sm text-red-500 bg-red-50 rounded-xl px-3 py-2">{authError}</p>
-              )}
-
-              <button
-                onClick={authenticate}
-                disabled={authing || !authPass.trim()}
-                className="mt-4 w-full py-3 bg-brand-600 hover:bg-brand-700 disabled:opacity-50 text-white font-bold rounded-xl transition-colors"
-              >
-                {authing ? 'جاري التحقق...' : 'دخول'}
-              </button>
-            </>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  // ── Action screen ─────────────────────────────────────────
   return (
     <div dir="rtl" className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-      <div className={card}>
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 max-w-md w-full">
+
+        {/* Header */}
         <div className="flex items-center gap-3 mb-6">
           <div className="w-10 h-10 bg-brand-50 rounded-full flex items-center justify-center text-xl">🚗</div>
           <div>
-            <p className="font-bold text-slate-900">WashTech — {cfg?.title}</p>
-            <p className="text-sm text-slate-500">{authName}</p>
+            <p className="font-bold text-slate-900">WashTech</p>
+            <p className="text-sm text-slate-500">{c?.title || 'إجراء'}</p>
           </div>
         </div>
 
+        {/* Loading */}
         {loading && (
           <div className="text-center py-10">
             <div className="w-8 h-8 border-2 border-brand-600 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
@@ -192,16 +82,18 @@ export default function ActionPage() {
           </div>
         )}
 
-        {fetchError && !loading && (
+        {/* Error */}
+        {error && !loading && (
           <div className="text-center py-8">
             <div className="text-4xl mb-3">⚠️</div>
-            <p className="text-red-600 font-medium">{fetchError}</p>
+            <p className="text-red-600 font-medium">{error}</p>
             <button onClick={() => window.location.reload()} className="mt-4 text-sm text-brand-600 underline">
               إعادة المحاولة
             </button>
           </div>
         )}
 
+        {/* Done */}
         {done && (
           <div className="text-center py-8">
             <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -214,20 +106,21 @@ export default function ActionPage() {
           </div>
         )}
 
-        {!loading && !fetchError && !done && booking && (
+        {/* Booking & action */}
+        {!loading && !error && !done && booking && (
           <>
             <div className="bg-slate-50 rounded-xl p-4 mb-5 space-y-2.5 text-sm">
-              {[
+              {([
                 ['العميل',  booking.name],
-                ['الهاتف',  <span dir="ltr" className="font-mono">{booking.phone}</span>],
+                ['الهاتف',  booking.phone],
                 ['المنطقة', booking.neighborhood],
                 ['السيارة', `${booking.carType} — ${booking.package}`],
                 ['الموعد',  `${booking.date === 'today' ? 'اليوم' : 'غداً'} ${booking.slot}`],
                 ['الحالة',  STATUS_AR[booking.status] || booking.status],
-              ].map(([label, val]) => (
-                <div key={label as string} className="flex justify-between items-center">
+              ] as [string, string][]).map(([label, val]) => (
+                <div key={label} className="flex justify-between items-center">
                   <span className="text-slate-500">{label}</span>
-                  <span className="font-medium text-slate-800">{val}</span>
+                  <span className="font-medium text-slate-800" dir={label === 'الهاتف' ? 'ltr' : 'rtl'}>{val}</span>
                 </div>
               ))}
             </div>
@@ -249,21 +142,19 @@ export default function ActionPage() {
 
             {act === 'approve' && drivers.length === 0 && (
               <p className="text-amber-600 text-sm mb-4 bg-amber-50 rounded-xl p-3">
-                ⚠️ لا يوجد سائقون متاحون. أضف سائقاً من لوحة الإدارة أولاً.
+                ⚠️ لا يوجد سائقون. أضف سائقاً من لوحة الإدارة أولاً.
               </p>
             )}
 
-            <div className="space-y-2">
-              {(act !== 'approve' || drivers.length > 0) && (
-                <button
-                  onClick={submit}
-                  disabled={submitting || (act === 'approve' && !driverId)}
-                  className={`w-full py-3 text-white font-bold rounded-xl transition-colors disabled:opacity-50 ${cfg?.color}`}
-                >
-                  {submitting ? 'جاري المعالجة...' : cfg?.btn}
-                </button>
-              )}
-            </div>
+            {(act !== 'approve' || drivers.length > 0) && (
+              <button
+                onClick={submit}
+                disabled={submitting || (act === 'approve' && !driverId)}
+                className={`w-full py-3 text-white font-bold rounded-xl transition-colors disabled:opacity-50 ${c?.color}`}
+              >
+                {submitting ? 'جاري المعالجة...' : `${c?.icon} ${c?.btn}`}
+              </button>
+            )}
           </>
         )}
       </div>

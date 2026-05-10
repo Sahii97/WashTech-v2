@@ -9,28 +9,13 @@ type Driver = { id: string; name: string; code: string };
 type Tab = 'pending' | 'approved' | 'rejected';
 
 export default function ManagerDashboard() {
-  const [authed, setAuthed] = useState(false);
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [loginError, setLoginError] = useState('');
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [tab, setTab] = useState<Tab>('pending');
   const [selectedDrivers, setSelectedDrivers] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
 
-  async function login() {
-    setLoginError('');
-    try {
-      const res = await fetch('/api/manager/login', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: username.trim(), password }),
-      });
-      const data = await res.json();
-      if (res.ok) { setAuthed(true); load(); }
-      else setLoginError(data.error || 'بيانات الدخول غير صحيحة');
-    } catch { setLoginError('خطأ في الاتصال، حاول مرة أخرى'); }
-  }
+  useEffect(() => { load(); }, []);
 
   async function load() {
     setLoading(true);
@@ -62,62 +47,6 @@ export default function ManagerDashboard() {
     approved: bookings.filter(b => ['approved','on_process','completed'].includes(b.status)).length,
     rejected: bookings.filter(b => b.status === 'rejected').length,
   };
-
-  if (!authed) {
-    return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-8 max-w-sm w-full">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 bg-brand-50 rounded-xl flex items-center justify-center text-xl">🚗</div>
-            <div>
-              <h1 className="text-xl font-bold text-slate-900">لوحة المدير</h1>
-              <p className="text-slate-500 text-xs">WashTech Manager</p>
-            </div>
-          </div>
-
-          <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-5 text-sm">
-            <p className="font-semibold text-amber-800 mb-1">الدخول الافتراضي</p>
-            <p className="text-amber-700 font-mono">كلمة المرور: <span className="font-bold">admin123</span></p>
-            <p className="text-amber-600 text-xs mt-1">يمكنك إنشاء حسابات المدراء من لوحة الإدارة</p>
-          </div>
-
-          <div className="space-y-3">
-            <input
-              type="text"
-              className="w-full px-4 py-3 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-              placeholder="اسم المستخدم (اتركه فارغاً للدخول الافتراضي)"
-              value={username}
-              onChange={e => setUsername(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && login()}
-              dir="ltr"
-              autoComplete="username"
-            />
-            <input
-              type="password"
-              className="w-full px-4 py-3 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-              placeholder="كلمة المرور"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && login()}
-              autoComplete="current-password"
-            />
-          </div>
-
-          {loginError && (
-            <p className="mt-3 text-sm text-red-500 bg-red-50 rounded-xl px-3 py-2">{loginError}</p>
-          )}
-
-          <button
-            onClick={login}
-            disabled={!password}
-            className="mt-4 w-full py-3 bg-brand-600 hover:bg-brand-700 disabled:opacity-40 text-white font-semibold rounded-xl transition-colors"
-          >
-            دخول
-          </button>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-slate-50">
