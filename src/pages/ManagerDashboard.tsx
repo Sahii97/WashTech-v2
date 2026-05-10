@@ -9,28 +9,13 @@ type Driver = { id: string; name: string; code: string };
 type Tab = 'pending' | 'approved' | 'rejected';
 
 export default function ManagerDashboard() {
-  const [authed, setAuthed] = useState(false);
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [loginError, setLoginError] = useState('');
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [tab, setTab] = useState<Tab>('pending');
   const [selectedDrivers, setSelectedDrivers] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
 
-  async function login() {
-    setLoginError('');
-    try {
-      const res = await fetch('/api/manager/login', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: username.trim(), password }),
-      });
-      const data = await res.json();
-      if (res.ok) { setAuthed(true); load(); }
-      else setLoginError(data.error || 'بيانات الدخول غير صحيحة');
-    } catch { setLoginError('خطأ في الاتصال، حاول مرة أخرى'); }
-  }
+  useEffect(() => { load(); }, []);
 
   async function load() {
     setLoading(true);
@@ -62,38 +47,6 @@ export default function ManagerDashboard() {
     approved: bookings.filter(b => ['approved','on_process','completed'].includes(b.status)).length,
     rejected: bookings.filter(b => b.status === 'rejected').length,
   };
-
-  if (!authed) {
-    return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-8 max-w-sm w-full">
-          <h1 className="text-2xl font-bold text-slate-900 mb-1">لوحة المدير</h1>
-          <p className="text-slate-500 text-sm mb-6">أدخل بيانات الدخول للمتابعة</p>
-          <input
-            type="text"
-            className="w-full px-4 py-3 border border-slate-300 rounded-xl mb-3 focus:outline-none focus:ring-2 focus:ring-brand-500"
-            placeholder="اسم المستخدم"
-            value={username}
-            onChange={e => setUsername(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && login()}
-            dir="ltr"
-          />
-          <input
-            type="password"
-            className="w-full px-4 py-3 border border-slate-300 rounded-xl mb-3 focus:outline-none focus:ring-2 focus:ring-brand-500"
-            placeholder="كلمة المرور"
-            value={password}
-            onChange={e => setPassword(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && login()}
-          />
-          {loginError && <p className="text-red-500 text-sm mb-3">{loginError}</p>}
-          <button onClick={login} className="w-full py-3 bg-brand-600 hover:bg-brand-700 text-white font-semibold rounded-xl transition-colors">
-            دخول
-          </button>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-slate-50">

@@ -67,10 +67,10 @@ export interface TemplateConfig { enabled: boolean; template: string; }
 export type NotificationTemplates = Record<EventKey, TemplateConfig>;
 
 const DEFAULT_TEMPLATES: NotificationTemplates = {
-  new_booking:      { enabled: true, template: '📦 حجز جديد #{{id}}\n👤 {{name}}\n📞 {{phone}}\n📍 {{neighborhood}}\n🚗 {{carType}} — {{package}}\n🕐 {{date}} {{slot}}\n\n✅ موافقة: {{approveLink}}\n❌ رفض: {{rejectLink}}' },
-  booking_approved: { enabled: true, template: '✅ لديك حجز جديد\n👤 {{name}}\n📞 {{phone}}\n📍 {{neighborhood}}\n🕐 {{slot}}\n\n▶️ قبول المهمة:\n{{acceptLink}}' },
-  driver_accepted:  { enabled: true, template: '🚗 سائقك في الطريق إليك!\n👨‍💼 السائق: {{driverName}}\n🕐 الوقت: {{slot}}\nسيصل قريباً. شكراً لاختيارك WashTech! 🧼' },
-  booking_rejected: { enabled: true, template: '❌ عذراً، لم نتمكن من قبول حجزك في هذا الوقت.\nيرجى المحاولة مرة أخرى أو اختيار وقت آخر.\nWashTech 🚗' },
+  new_booking:      { enabled: true, template: '📦 *حجز جديد* #{{id}}\n👤 {{name}}\n📞 {{phone}}\n📍 {{neighborhood}}\n🚗 {{carType}} — {{package}}\n🕐 {{date}} {{slot}}\n\n──────────────\n✅ *قبول الحجز:*\n{{approveLink}}\n\n❌ *رفض الحجز:*\n{{rejectLink}}' },
+  booking_approved: { enabled: true, template: '✅ *مهمة جديدة*\n👤 {{name}}\n📞 {{phone}}\n📍 {{neighborhood}}\n🕐 {{slot}}\n\n──────────────\n▶️ *اضغط لقبول المهمة:*\n{{acceptLink}}' },
+  driver_accepted:  { enabled: true, template: '🚗 *سائقك في الطريق إليك!*\n👨‍💼 السائق: {{driverName}}\n🕐 الوقت: {{slot}}\n\nسيصل قريباً. شكراً لاختيارك WashTech! 🧼' },
+  booking_rejected: { enabled: true, template: '❌ عذراً {{name}}،\nلم نتمكن من قبول حجزك في هذا الوقت.\nيرجى المحاولة مرة أخرى أو اختيار وقت آخر.\n\nWashTech 🚗' },
 };
 
 function applyTemplate(template: string, vars: Record<string, string>): string {
@@ -179,15 +179,18 @@ app.post('/api/bookings', async (req, res) => {
     const booking = { ...req.body, status: 'pending', createdAt: new Date().toISOString() };
     const docRef = await addDoc(collection(db, 'bookings'), booking);
     const id = docRef.id;
-    notify('new_booking', {
-      id: id.slice(-5), name: booking.name || '', phone: booking.phone || '',
-      neighborhood: booking.neighborhood || '', carType: booking.carType || '',
-      package: booking.package || '',
-      date: booking.date === 'today' ? 'اليوم' : 'غداً',
-      slot: booking.slot || '',
-      approveLink: `${APP_URL}/action?id=${id}&act=approve`,
-      rejectLink:  `${APP_URL}/action?id=${id}&act=reject`,
-    }, MANAGER_PHONE).catch(console.error);
+    // Await before res.json — Vercel kills the function after responding
+    try {
+      await notify('new_booking', {
+        id: id.slice(-5), name: booking.name || '', phone: booking.phone || '',
+        neighborhood: booking.neighborhood || '', carType: booking.carType || '',
+        package: booking.package || '',
+        date: booking.date === 'today' ? 'اليوم' : 'غداً',
+        slot: booking.slot || '',
+        approveLink: `${APP_URL}/action?id=${id}&act=approve`,
+        rejectLink:  `${APP_URL}/action?id=${id}&act=reject`,
+      }, MANAGER_PHONE);
+    } catch (e) { console.error('[notify new_booking]', e); }
     res.json({ success: true, id });
   } catch (e) {
     console.error('[booking]', e);
@@ -263,18 +266,22 @@ app.post('/api/manager/action', async (req, res) => {
       await updateDoc(bookingRef, { status: 'approved', driverId, updatedAt: new Date().toISOString() });
       const driverDoc = await getDoc(doc(db, 'drivers', driverId));
       const driver = driverDoc.exists() ? (driverDoc.data() as any) : { name: 'السائق', phone: '' };
-      notify('booking_approved', {
-        name: booking?.name || '', phone: booking?.phone || '',
-        neighborhood: booking?.neighborhood || '', slot: booking?.slot || '',
-        driverName: driver.name, driverPhone: driver.phone || '',
-        acceptLink: `${APP_URL}/action?id=${bookingId}&act=accept`,
-      }, driver.phone || MANAGER_PHONE).catch(console.error);
+      try {
+        await notify('booking_approved', {
+          name: booking?.name || '', phone: booking?.phone || '',
+          neighborhood: booking?.neighborhood || '', slot: booking?.slot || '',
+          driverName: driver.name, driverPhone: driver.phone || '',
+          acceptLink: `${APP_URL}/action?id=${bookingId}&act=accept`,
+        }, driver.phone || MANAGER_PHONE);
+      } catch (e) { console.error('[notify booking_approved]', e); }
 
     } else if (action === 'reject') {
       await updateDoc(bookingRef, { status: 'rejected', updatedAt: new Date().toISOString() });
-      notify('booking_rejected', {
-        name: booking?.name || '', phone: booking?.phone || '',
-      }, booking?.phone || '').catch(console.error);
+      try {
+        await notify('booking_rejected', {
+          name: booking?.name || '', phone: booking?.phone || '',
+        }, booking?.phone || '');
+      } catch (e) { console.error('[notify booking_rejected]', e); }
     }
 
     res.json({ success: true });
@@ -309,16 +316,18 @@ app.post('/api/driver/update-status', async (req, res) => {
   try {
     await updateDoc(doc(db, 'bookings', bookingId), { status, updatedAt: new Date().toISOString() });
 
-    // When driver accepts → notify customer
+    // When driver accepts → notify customer (awaited before responding)
     if (status === 'on_process' && driverId) {
       const snap = await getDocs(collection(db, 'bookings'));
       const booking = snap.docs.find(d => d.id === bookingId)?.data() as any;
       const driverDoc = await getDoc(doc(db, 'drivers', driverId));
       const driver = driverDoc.exists() ? (driverDoc.data() as any) : { name: 'السائق' };
-      notify('driver_accepted', {
-        name: booking?.name || '', phone: booking?.phone || '',
-        driverName: driver.name, slot: booking?.slot || '',
-      }, booking?.phone || '').catch(console.error);
+      try {
+        await notify('driver_accepted', {
+          name: booking?.name || '', phone: booking?.phone || '',
+          driverName: driver.name, slot: booking?.slot || '',
+        }, booking?.phone || '');
+      } catch (e) { console.error('[notify driver_accepted]', e); }
     }
 
     res.json({ success: true });
