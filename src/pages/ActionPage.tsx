@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { IcCar, IcCheck, IcX, IcPlay, IcWarning } from '../icons';
 
 type Act = 'approve' | 'reject' | 'accept';
 
@@ -54,10 +55,10 @@ export default function ActionPage() {
     setSubmitting(false);
   }
 
-  const cfg: Record<string, { title: string; btn: string; color: string; icon: string }> = {
-    approve: { title: 'قبول الحجز',   btn: 'قبول وإرسال للسائق',        color: 'bg-green-600 hover:bg-green-700', icon: '✅' },
-    reject:  { title: 'رفض الحجز',    btn: 'رفض وإشعار العميل',          color: 'bg-red-500  hover:bg-red-600',   icon: '❌' },
-    accept:  { title: 'قبول المهمة',  btn: 'قبول المهمة وإشعار العميل',  color: 'bg-blue-600 hover:bg-blue-700',  icon: '▶️' },
+  const cfg: Record<string, { title: string; btn: string; color: string; Icon: React.FC<{ className?: string }> }> = {
+    approve: { title: 'قبول الحجز',  btn: 'قبول وإرسال للسائق',       color: 'bg-green-600 hover:bg-green-700', Icon: IcCheck },
+    reject:  { title: 'رفض الحجز',   btn: 'رفض وإشعار العميل',         color: 'bg-red-500  hover:bg-red-600',   Icon: IcX },
+    accept:  { title: 'قبول المهمة', btn: 'قبول المهمة وإشعار العميل', color: 'bg-blue-600 hover:bg-blue-700',  Icon: IcPlay },
   };
   const c = cfg[act];
 
@@ -67,7 +68,9 @@ export default function ActionPage() {
 
         {/* Header */}
         <div className="flex items-center gap-3 mb-6">
-          <div className="w-10 h-10 bg-brand-50 rounded-full flex items-center justify-center text-xl">🚗</div>
+          <div className="w-10 h-10 bg-brand-50 rounded-full flex items-center justify-center">
+              <IcCar className="w-5 h-5 text-brand-600" />
+            </div>
           <div>
             <p className="font-bold text-slate-900">WashTech</p>
             <p className="text-sm text-slate-500">{c?.title || 'إجراء'}</p>
@@ -85,7 +88,9 @@ export default function ActionPage() {
         {/* Error */}
         {error && !loading && (
           <div className="text-center py-8">
-            <div className="text-4xl mb-3">⚠️</div>
+            <div className="w-12 h-12 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-3">
+              <IcWarning className="w-6 h-6 text-red-500" />
+            </div>
             <p className="text-red-600 font-medium">{error}</p>
             <button onClick={() => window.location.reload()} className="mt-4 text-sm text-brand-600 underline">
               إعادة المحاولة
@@ -150,9 +155,10 @@ export default function ActionPage() {
               <button
                 onClick={submit}
                 disabled={submitting || (act === 'approve' && !driverId)}
-                className={`w-full py-3 text-white font-bold rounded-xl transition-colors disabled:opacity-50 ${c?.color}`}
+                className={`w-full py-3 text-white font-bold rounded-xl transition-colors disabled:opacity-50 flex items-center justify-center gap-2 ${c?.color}`}
               >
-                {submitting ? 'جاري المعالجة...' : `${c?.icon} ${c?.btn}`}
+                {!submitting && c?.Icon && <c.Icon className="w-5 h-5" />}
+                {submitting ? 'جاري المعالجة...' : c?.btn}
               </button>
             )}
           </>

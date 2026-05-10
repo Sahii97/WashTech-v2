@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { IcCar, IcPhone, IcMapPin, IcClock, IcCheck, IcPlay, IcRefresh } from '../icons';
 
 type Task = {
   id: string; name: string; phone: string; neighborhood: string;
@@ -20,7 +21,7 @@ export default function DriverView() {
         const list: Driver[] = d.drivers || [];
         setAllDrivers(list);
         setDriversLoading(false);
-        if (list.length === 1) selectDriver(list[0]); // auto-select sole driver
+        if (list.length === 1) selectDriver(list[0]);
       })
       .catch(() => setDriversLoading(false));
   }, []);
@@ -52,7 +53,9 @@ export default function DriverView() {
       <div dir="rtl" className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-8 max-w-sm w-full">
           <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 bg-brand-50 rounded-xl flex items-center justify-center text-xl">🚗</div>
+            <div className="w-10 h-10 bg-brand-50 rounded-xl flex items-center justify-center">
+              <IcCar className="w-5 h-5 text-brand-600" />
+            </div>
             <div>
               <h1 className="text-xl font-bold text-slate-900">بوابة السائق</h1>
               <p className="text-slate-500 text-sm">اختر اسمك للمتابعة</p>
@@ -105,9 +108,7 @@ export default function DriverView() {
             className="p-2 hover:bg-slate-100 rounded-xl transition-colors"
             title="تحديث"
           >
-            <svg className={`w-5 h-5 text-slate-500 ${loading ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
+            <IcRefresh className={`w-5 h-5 text-slate-500 ${loading ? 'animate-spin' : ''}`} />
           </button>
           <button
             onClick={() => { setDriver(null); setTasks([]); }}
@@ -126,7 +127,7 @@ export default function DriverView() {
         )}
         {!loading && tasks.length === 0 && (
           <div className="bg-white rounded-2xl border border-slate-200 p-10 text-center text-slate-400">
-            <div className="text-4xl mb-3">📭</div>
+            <IcCar className="w-10 h-10 mx-auto mb-3 text-slate-300" />
             <p>لا توجد مهام نشطة</p>
           </div>
         )}
@@ -140,26 +141,28 @@ export default function DriverView() {
                 {task.status === 'approved' ? 'جديد' : 'جاري'}
               </span>
             </div>
-            <div className="space-y-1 text-sm text-slate-600 mb-4">
-              <p>📞 <span dir="ltr">{task.phone}</span></p>
-              <p>📍 {task.neighborhood}</p>
-              <p>🚗 {task.carType} · {task.package}</p>
-              <p>🕐 {task.date === 'today' ? 'اليوم' : 'غداً'} — {task.slot}</p>
+            <div className="space-y-1.5 text-sm text-slate-600 mb-4">
+              <p className="flex items-center gap-2"><IcPhone className="w-4 h-4 text-slate-400 flex-shrink-0" /><span dir="ltr">{task.phone}</span></p>
+              <p className="flex items-center gap-2"><IcMapPin className="w-4 h-4 text-slate-400 flex-shrink-0" />{task.neighborhood}</p>
+              <p className="flex items-center gap-2"><IcCar className="w-4 h-4 text-slate-400 flex-shrink-0" />{task.carType} · {task.package}</p>
+              <p className="flex items-center gap-2"><IcClock className="w-4 h-4 text-slate-400 flex-shrink-0" />{task.date === 'today' ? 'اليوم' : 'غداً'} — {task.slot}</p>
             </div>
             {task.status === 'approved' && (
               <button
                 onClick={() => updateStatus(task.id, 'on_process')}
-                className="w-full py-2.5 bg-brand-600 hover:bg-brand-700 text-white font-semibold rounded-xl transition-colors text-sm"
+                className="w-full py-2.5 bg-brand-600 hover:bg-brand-700 text-white font-semibold rounded-xl transition-colors text-sm flex items-center justify-center gap-2"
               >
-                ▶️ قبول المهمة — بدء التنفيذ
+                <IcPlay className="w-4 h-4" />
+                قبول المهمة — بدء التنفيذ
               </button>
             )}
             {task.status === 'on_process' && (
               <button
                 onClick={() => updateStatus(task.id, 'completed')}
-                className="w-full py-2.5 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-xl transition-colors text-sm"
+                className="w-full py-2.5 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-xl transition-colors text-sm flex items-center justify-center gap-2"
               >
-                ✅ تم الانتهاء
+                <IcCheck className="w-4 h-4" />
+                تم الانتهاء
               </button>
             )}
           </div>

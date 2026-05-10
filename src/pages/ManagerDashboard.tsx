@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { IcCheck, IcX, IcRefresh } from '../icons';
 
 type Booking = {
   id: string; name: string; phone: string; neighborhood: string;
@@ -57,9 +58,7 @@ export default function ManagerDashboard() {
           <p className="text-sm text-slate-500">{bookings.length} حجز إجمالي</p>
         </div>
         <button onClick={load} className="p-2 hover:bg-slate-100 rounded-xl transition-colors" title="تحديث">
-          <svg className={`w-5 h-5 text-slate-500 ${loading ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-          </svg>
+          <IcRefresh className={`w-5 h-5 text-slate-500 ${loading ? 'animate-spin' : ''}`} />
         </button>
       </header>
 
@@ -115,15 +114,15 @@ export default function ManagerDashboard() {
                   </select>
                   <button
                     onClick={() => action(b.id, 'approve')}
-                    className="w-full py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold rounded-lg transition-colors"
+                    className="w-full py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold rounded-lg transition-colors flex items-center justify-center gap-1.5"
                   >
-                    ✓ قبول
+                    <IcCheck className="w-4 h-4" /> قبول
                   </button>
                   <button
                     onClick={() => action(b.id, 'reject')}
-                    className="w-full py-2 border border-red-300 text-red-600 hover:bg-red-50 text-sm font-semibold rounded-lg transition-colors"
+                    className="w-full py-2 border border-red-300 text-red-600 hover:bg-red-50 text-sm font-semibold rounded-lg transition-colors flex items-center justify-center gap-1.5"
                   >
-                    ✕ رفض
+                    <IcX className="w-4 h-4" /> رفض
                   </button>
                 </div>
               )}

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { t, Lang } from '../translations';
+import { IcSearch, IcChevronDown } from '../icons';
 
 type Step = 1 | 2 | 3;
 type Status = 'idle' | 'submitting' | 'success' | 'error';
@@ -106,15 +107,11 @@ export default function BookingPage() {
               onClick={() => setTrackOpen(o => !o)}
               className="w-full flex items-center justify-between px-4 py-3 bg-slate-50 hover:bg-slate-100 transition-colors"
             >
-              <span className="text-sm font-medium text-slate-700">
-                🔎 {lang === 'ar' ? 'تتبع طلبي' : 'ئۆردەرم بشوێندەبکەوە'}
+              <span className="flex items-center gap-2 text-sm font-medium text-slate-700">
+                <IcSearch className="w-4 h-4 text-slate-400" />
+                {lang === 'ar' ? 'تتبع طلبي' : 'ئۆردەرم بشوێندەبکەوە'}
               </span>
-              <svg
-                className={`w-4 h-4 text-slate-400 transition-transform ${trackOpen ? 'rotate-180' : ''}`}
-                fill="none" viewBox="0 0 24 24" stroke="currentColor"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
+              <IcChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${trackOpen ? 'rotate-180' : ''}`} />
             </button>
             {trackOpen && (
               <div className="px-4 py-3 bg-white border-t border-slate-200">
@@ -322,8 +319,9 @@ export default function BookingPage() {
 
         {/* Track link */}
         <div className="mt-4 text-center">
-          <a href="/track" className="text-sm text-slate-400 hover:text-brand-600 transition-colors">
-            🔎 {lang === 'ar' ? 'تتبع حجز سابق' : 'حجزێکی پێشوو شوێندەکەوە'}
+          <a href="/track" className="inline-flex items-center gap-1.5 text-sm text-slate-400 hover:text-brand-600 transition-colors">
+            <IcSearch className="w-4 h-4" />
+            {lang === 'ar' ? 'تتبع حجز سابق' : 'حجزێکی پێشوو شوێندەکەوە'}
           </a>
         </div>
       </main>

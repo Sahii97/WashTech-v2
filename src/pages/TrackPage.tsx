@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { IcSearch } from '../icons';
 
 const STATUS_AR: Record<string, { label: string; color: string }> = {
   pending:    { label: 'قيد الانتظار',  color: 'bg-amber-100 text-amber-700' },
@@ -54,7 +55,7 @@ export default function TrackPage() {
             <input
               type="tel"
               dir="ltr"
-              placeholder="+9647xxxxxxxxx"
+              placeholder="07XXXXXXXX"
               value={phone}
               onChange={e => setPhone(e.target.value)}
               className="flex-1 px-4 py-2.5 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent bg-white"
@@ -77,7 +78,9 @@ export default function TrackPage() {
 
         {searched && !error && bookings.length === 0 && (
           <div className="text-center py-12 text-slate-400">
-            <div className="text-4xl mb-3">🔍</div>
+            <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-3">
+              <IcSearch className="w-6 h-6 text-slate-400" />
+            </div>
             <p className="font-medium">لم يتم العثور على حجوزات</p>
             <p className="text-sm mt-1">تأكد من رقم الهاتف المستخدم عند الحجز</p>
           </div>
