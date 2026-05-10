@@ -16,7 +16,12 @@ export default function DriverView() {
   useEffect(() => {
     fetch('/api/drivers')
       .then(r => r.json())
-      .then(d => { setAllDrivers(d.drivers || []); setDriversLoading(false); })
+      .then(d => {
+        const list: Driver[] = d.drivers || [];
+        setAllDrivers(list);
+        setDriversLoading(false);
+        if (list.length === 1) selectDriver(list[0]); // auto-select sole driver
+      })
       .catch(() => setDriversLoading(false));
   }, []);
 

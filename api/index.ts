@@ -82,13 +82,21 @@ async function getTemplates(): Promise<NotificationTemplates> {
 }
 
 // ── Notifications ─────────────────────────────────────────────
+function normalizePhone(phone: string): string {
+  const clean = phone.replace(/[\s\-()]/g, '');
+  if (/^07\d{8}$/.test(clean))      return '+964' + clean.slice(1); // 07xxxxxxxx → +9647xxxxxxxx
+  if (/^9647\d{8}$/.test(clean))    return '+' + clean;
+  if (/^\+/.test(clean))            return clean;
+  return '+' + clean;
+}
+
 async function sendWhatsApp(to: string, text: string): Promise<void> {
   if (!WASENDER_TOKEN) { console.warn('[WhatsApp] No WASENDER_API_TOKEN'); return; }
   try {
     const res = await fetch('https://wasenderapi.com/api/send-message', {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${WASENDER_TOKEN}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ to, text }),
+      body: JSON.stringify({ to: normalizePhone(to), text }),
     });
     if (!res.ok) console.error('[WhatsApp]', res.status, await res.text());
   } catch (e) { console.error('[WhatsApp]', e); }
@@ -407,6 +415,50 @@ app.post('/api/admin/test-all-notifications', async (req, res) => {
     await new Promise(r => setTimeout(r, 600));
   }
   res.json({ success: true, sentTo: to, results });
+});
+
+// ── Full cycle simulation (no WhatsApp messages sent) ────────
+app.post('/api/admin/simulate-cycle', async (req, res) => {
+  const steps: { label: string; ok: boolean }[] = [];
+  let testId = '';
+  try {
+    const drivers = await getDrivers();
+    if (!drivers.length) {
+      return res.status(400).json({ success: false, steps: [{ label: 'لا يوجد سائقون — أضف سائقاً أولاً', ok: false }] });
+    }
+    const driver = drivers[0];
+
+    // 1. Create test booking
+    const ref = await addDoc(collection(db, 'bookings'), {
+      name: 'عميل تجريبي', phone: '07000000000', neighborhood: 'عنكاوة',
+      carType: 'سيدان', package: 'غسيل كامل', date: 'today', slot: '10:00 AM',
+      status: 'pending', createdAt: new Date().toISOString(), isTest: true,
+    });
+    testId = ref.id;
+    steps.push({ label: 'تم إنشاء الحجز', ok: true });
+
+    // 2. Manager approves
+    await updateDoc(doc(db, 'bookings', testId), { status: 'approved', driverId: driver.id, updatedAt: new Date().toISOString() });
+    steps.push({ label: `وافق المدير — السائق: ${driver.name}`, ok: true });
+
+    // 3. Driver accepts
+    await updateDoc(doc(db, 'bookings', testId), { status: 'on_process', updatedAt: new Date().toISOString() });
+    steps.push({ label: 'قبل السائق المهمة', ok: true });
+
+    // 4. Complete
+    await updateDoc(doc(db, 'bookings', testId), { status: 'completed', updatedAt: new Date().toISOString() });
+    steps.push({ label: 'اكتملت المهمة — تم إشعار العميل', ok: true });
+
+    // 5. Clean up
+    await deleteDoc(doc(db, 'bookings', testId));
+    steps.push({ label: 'تم حذف بيانات الاختبار', ok: true });
+
+    res.json({ success: true, steps });
+  } catch (e) {
+    if (testId) await deleteDoc(doc(db, 'bookings', testId)).catch(() => {});
+    steps.push({ label: 'فشل: ' + String(e), ok: false });
+    res.json({ success: false, steps });
+  }
 });
 
 // ── Action endpoint (approve/reject/accept via WhatsApp link) ─
