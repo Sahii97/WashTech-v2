@@ -1,5 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
 
+// ── Build info ────────────────────────────────────────────────
+function timeAgo(iso: string): string {
+  const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+  if (diff < 60)   return `${diff}s ago`;
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400)return `${Math.floor(diff / 3600)}h ago`;
+  return `${Math.floor(diff / 86400)}d ago`;
+}
+const BUILD_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '2.0.0';
+const BUILD_TIME    = typeof __BUILD_TIME__    !== 'undefined' ? __BUILD_TIME__    : new Date().toISOString();
+
 // ── Types ─────────────────────────────────────────────────────
 type Driver   = { id: string; name: string; code: string; phone?: string };
 type Manager  = { id: string; name: string; username: string };
@@ -231,7 +242,9 @@ export default function AdminDashboard() {
           </div>
           <div>
             <h1 className="font-bold text-slate-900 leading-none">WashTech Admin</h1>
-            <p className="text-xs text-slate-400 mt-0.5">{bookingCount} حجز · {drivers.length} سائق</p>
+            <p className="text-xs text-slate-400 mt-0.5">
+              v{BUILD_VERSION} · updated {timeAgo(BUILD_TIME)} · {bookingCount} حجز · {drivers.length} سائق
+            </p>
           </div>
         </div>
         <button onClick={loadAll} className="p-2 hover:bg-slate-100 rounded-xl transition-colors text-slate-400 hover:text-slate-600">
