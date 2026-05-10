@@ -417,8 +417,10 @@ app.post('/api/admin/test-all-notifications', async (req, res) => {
   res.json({ success: true, sentTo: to, results });
 });
 
-// ── Full cycle simulation (no WhatsApp messages sent) ────────
+// ── Full cycle simulation (with real WhatsApp messages) ──────
 app.post('/api/admin/simulate-cycle', async (req, res) => {
+  const { testPhone: rawPhone } = req.body;
+  const customerPhone = rawPhone?.trim() ? normalizePhone(rawPhone.trim()) : MANAGER_PHONE;
   const steps: { label: string; ok: boolean }[] = [];
   let testId = '';
   try {
@@ -430,27 +432,56 @@ app.post('/api/admin/simulate-cycle', async (req, res) => {
 
     // 1. Create test booking
     const ref = await addDoc(collection(db, 'bookings'), {
-      name: 'عميل تجريبي', phone: '07000000000', neighborhood: 'عنكاوة',
+      name: 'عميل تجريبي', phone: customerPhone, neighborhood: 'عنكاوة',
       carType: 'سيدان', package: 'غسيل كامل', date: 'today', slot: '10:00 AM',
       status: 'pending', createdAt: new Date().toISOString(), isTest: true,
     });
     testId = ref.id;
-    steps.push({ label: 'تم إنشاء الحجز', ok: true });
+    steps.push({ label: 'تم إنشاء الحجز التجريبي', ok: true });
 
-    // 2. Manager approves
+    // 2. Send new_booking → manager
+    try {
+      await notify('new_booking', {
+        id: testId.slice(-5), name: 'عميل تجريبي', phone: customerPhone,
+        neighborhood: 'عنكاوة', carType: 'سيدان', package: 'غسيل كامل',
+        date: 'اليوم', slot: '10:00 AM',
+        approveLink: `${APP_URL}/action?id=${testId}&act=approve`,
+        rejectLink:  `${APP_URL}/action?id=${testId}&act=reject`,
+      }, MANAGER_PHONE);
+      steps.push({ label: `إشعار المدير أُرسل ✓ → ${MANAGER_PHONE}`, ok: true });
+    } catch (e) { steps.push({ label: 'فشل إشعار المدير', ok: false }); }
+
+    // 3. Manager approves
     await updateDoc(doc(db, 'bookings', testId), { status: 'approved', driverId: driver.id, updatedAt: new Date().toISOString() });
     steps.push({ label: `وافق المدير — السائق: ${driver.name}`, ok: true });
 
-    // 3. Driver accepts
+    // 4. Send booking_approved → driver
+    try {
+      await notify('booking_approved', {
+        name: 'عميل تجريبي', phone: customerPhone,
+        neighborhood: 'عنكاوة', slot: '10:00 AM',
+        driverName: driver.name, driverPhone: driver.phone || '',
+        acceptLink: `${APP_URL}/action?id=${testId}&act=accept`,
+      }, driver.phone || MANAGER_PHONE);
+      steps.push({ label: `إشعار السائق أُرسل ✓ → ${driver.phone || MANAGER_PHONE}`, ok: true });
+    } catch (e) { steps.push({ label: 'فشل إشعار السائق', ok: false }); }
+
+    // 5. Driver accepts
     await updateDoc(doc(db, 'bookings', testId), { status: 'on_process', updatedAt: new Date().toISOString() });
     steps.push({ label: 'قبل السائق المهمة', ok: true });
 
-    // 4. Complete
-    await updateDoc(doc(db, 'bookings', testId), { status: 'completed', updatedAt: new Date().toISOString() });
-    steps.push({ label: 'اكتملت المهمة — تم إشعار العميل', ok: true });
+    // 6. Send driver_accepted → customer
+    try {
+      await notify('driver_accepted', {
+        name: 'عميل تجريبي', phone: customerPhone,
+        driverName: driver.name, slot: '10:00 AM',
+      }, customerPhone);
+      steps.push({ label: `إشعار العميل أُرسل ✓ → ${customerPhone}`, ok: true });
+    } catch (e) { steps.push({ label: 'فشل إشعار العميل', ok: false }); }
 
-    // 5. Clean up
+    // 7. Clean up
     await deleteDoc(doc(db, 'bookings', testId));
+    testId = '';
     steps.push({ label: 'تم حذف بيانات الاختبار', ok: true });
 
     res.json({ success: true, steps });

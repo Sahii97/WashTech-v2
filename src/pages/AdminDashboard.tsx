@@ -3,10 +3,10 @@ import React, { useState, useEffect, useRef } from 'react';
 // ── Build info ────────────────────────────────────────────────
 function timeAgo(iso: string): string {
   const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
-  if (diff < 60)   return `${diff}s ago`;
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-  if (diff < 86400)return `${Math.floor(diff / 3600)}h ago`;
-  return `${Math.floor(diff / 86400)}d ago`;
+  if (diff < 60)    return `منذ ${diff} ث`;
+  if (diff < 3600)  return `منذ ${Math.floor(diff / 60)} د`;
+  if (diff < 86400) return `منذ ${Math.floor(diff / 3600)} س`;
+  return `منذ ${Math.floor(diff / 86400)} يوم`;
 }
 const BUILD_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '2.0.0';
 const BUILD_TIME    = typeof __BUILD_TIME__    !== 'undefined' ? __BUILD_TIME__    : new Date().toISOString();
@@ -177,7 +177,10 @@ export default function AdminDashboard() {
   async function simulate() {
     setSimulating(true);
     setSimSteps([]);
-    const res = await fetch('/api/admin/simulate-cycle', { method: 'POST' });
+    const res = await fetch('/api/admin/simulate-cycle', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ testPhone: testPhone.trim() || undefined }),
+    });
     const data = await res.json();
     setSimSteps(data.steps || []);
     setSimulating(false);
@@ -241,9 +244,9 @@ export default function AdminDashboard() {
             </svg>
           </div>
           <div>
-            <h1 className="font-bold text-slate-900 leading-none">WashTech Admin</h1>
+            <h1 className="font-bold text-slate-900 leading-none">واش تك — الإدارة</h1>
             <p className="text-xs text-slate-400 mt-0.5">
-              v{BUILD_VERSION} · updated {timeAgo(BUILD_TIME)} · {bookingCount} حجز · {drivers.length} سائق
+              v{BUILD_VERSION} · {timeAgo(BUILD_TIME)} · {bookingCount} حجز · {drivers.length} سائق
             </p>
           </div>
         </div>
@@ -316,15 +319,25 @@ export default function AdminDashboard() {
 
               {/* Full Cycle Simulation */}
               <div className="bg-white rounded-2xl border border-slate-200 p-5">
-                <div className="flex items-start justify-between mb-4">
-                  <div>
-                    <h3 className="font-bold text-slate-900">محاكاة دورة كاملة</h3>
-                    <p className="text-xs text-slate-500 mt-0.5">اختبار سير العمل بدون إرسال رسائل واتساب</p>
-                  </div>
+                <div className="mb-4">
+                  <h3 className="font-bold text-slate-900">اختبار دورة كاملة</h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    حجز تجريبي → موافقة → سائق → عميل — مع إرسال واتساب حقيقي
+                  </p>
+                </div>
+                <input
+                  type="tel" dir="ltr"
+                  placeholder="07XXXXXXXX (رقم العميل التجريبي)"
+                  value={testPhone}
+                  onChange={e => setTestPhone(e.target.value)}
+                  className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
+                />
+                <div className="flex items-center justify-between">
+                  <p className="text-xs text-slate-400">المدير يستقبل على رقمه · السائق على رقمه · العميل على الرقم أعلاه</p>
                   <button
                     onClick={simulate}
                     disabled={simulating}
-                    className="flex items-center gap-2 px-4 py-2 bg-slate-900 hover:bg-slate-700 disabled:opacity-50 text-white text-sm font-semibold rounded-xl transition-colors"
+                    className="flex items-center gap-2 px-4 py-2 bg-slate-900 hover:bg-slate-700 disabled:opacity-50 text-white text-sm font-semibold rounded-xl transition-colors shrink-0 mr-3"
                   >
                     {IC.play}
                     {simulating ? 'جاري...' : 'تشغيل'}
