@@ -1,14 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { Car as IcCar, Check as IcCheck, X as IcX, Play as IcPlay, AlertTriangle as IcWarning } from 'lucide-react';
+import { Car as IcCar, Check as IcCheck, X as IcX, Play as IcPlay, Navigation as IcNav, Flag as IcFlag, AlertTriangle as IcWarning } from 'lucide-react';
 
-type Act = 'approve' | 'reject' | 'accept';
+type Act = 'approve' | 'reject' | 'accept' | 'on_road' | 'complete';
 
 const STATUS_AR: Record<string, string> = {
   pending:    'قيد الانتظار',
   approved:   'مقبول',
+  accepted:   'تم القبول',
   rejected:   'مرفوض',
   on_process: 'في الطريق',
+  on_road:    'في الطريق',
   completed:  'مكتمل',
+  closed:     'مغلق',
 };
 
 export default function ActionPage() {
@@ -49,16 +52,23 @@ export default function ActionPage() {
         body: JSON.stringify({ id, act, driverId }),
       });
       const data = await res.json();
-      if (data.success) { setDone(true); setResult(data.message); }
-      else setError(data.error || 'حدث خطأ');
+      if (res.status === 409) {
+        setError(data.error || 'لا يمكن تنفيذ هذا الإجراء على الحالة الحالية');
+      } else if (data.success) {
+        setDone(true); setResult(data.message);
+      } else {
+        setError(data.error || 'حدث خطأ');
+      }
     } catch { setError('خطأ في الاتصال'); }
     setSubmitting(false);
   }
 
-  const cfg: Record<string, { title: string; btn: string; color: string; Icon: React.FC<{ className?: string }> }> = {
-    approve: { title: 'قبول الحجز',  btn: 'قبول وإرسال للكابتن',        color: 'bg-green-600 hover:bg-green-700', Icon: IcCheck },
-    reject:  { title: 'رفض الحجز',   btn: 'رفض وإشعار العميل',          color: 'bg-red-500  hover:bg-red-600',   Icon: IcX },
-    accept:  { title: 'قبول المهمة', btn: 'قبول المهمة وإشعار العميل',  color: 'bg-blue-600 hover:bg-blue-700',  Icon: IcPlay },
+  const cfg: Record<Act, { title: string; btn: string; color: string; Icon: React.FC<{ className?: string }> }> = {
+    approve:  { title: 'قبول الحجز',       btn: 'قبول وإرسال للكابتن',       color: 'bg-green-600 hover:bg-green-700', Icon: IcCheck },
+    reject:   { title: 'رفض الحجز',        btn: 'رفض وإشعار العميل',         color: 'bg-red-500  hover:bg-red-600',   Icon: IcX },
+    accept:   { title: 'قبول المهمة',      btn: 'قبول المهمة وإشعار العميل', color: 'bg-blue-600 hover:bg-blue-700',  Icon: IcPlay },
+    on_road:  { title: 'الكابتن في الطريق', btn: 'تأكيد الانطلاق',            color: 'bg-indigo-600 hover:bg-indigo-700', Icon: IcNav },
+    complete: { title: 'إتمام الخدمة',     btn: 'تأكيد الإتمام',             color: 'bg-teal-600 hover:bg-teal-700',  Icon: IcFlag },
   };
   const c = cfg[act];
 
@@ -69,8 +79,8 @@ export default function ActionPage() {
         {/* Header */}
         <div className="flex items-center gap-3 mb-6">
           <div className="w-10 h-10 bg-brand-50 rounded-full flex items-center justify-center">
-              <IcCar className="w-5 h-5 text-brand-600" />
-            </div>
+            <IcCar className="w-5 h-5 text-brand-600" />
+          </div>
           <div>
             <p className="font-bold text-slate-900 dark:text-white">WashTech</p>
             <p className="text-sm text-slate-500 dark:text-slate-400">{c?.title || 'إجراء'}</p>

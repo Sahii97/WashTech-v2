@@ -1,16 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { Car as IcCar, Phone as IcPhone, MapPin as IcMapPin, Clock as IcClock, Check as IcCheck, Play as IcPlay, RefreshCw as IcRefresh } from 'lucide-react';
+import { Car as IcCar, Phone as IcPhone, MapPin as IcMapPin, Clock as IcClock, Check as IcCheck, Play as IcPlay, RefreshCw as IcRefresh, Navigation as IcNav, Wallet as IcWallet } from 'lucide-react';
 
 type Task = {
   id: string; name: string; phone: string; neighborhood: string;
   carType: string; package: string; date: string; slot: string; status: string;
 };
 type Driver = { id: string; name: string; code: string; phone?: string };
+type Wallet = { balance: number; totalEarned: number; totalWithdrawn: number };
 
 export default function DriverView() {
   const [allDrivers, setAllDrivers] = useState<Driver[]>([]);
   const [driver,     setDriver]     = useState<Driver | null>(null);
   const [tasks,      setTasks]      = useState<Task[]>([]);
+  const [wallet,     setWallet]     = useState<Wallet | null>(null);
   const [loading,    setLoading]    = useState(false);
   const [driversLoading, setDriversLoading] = useState(true);
 
@@ -29,22 +31,50 @@ export default function DriverView() {
   async function selectDriver(d: Driver) {
     setDriver(d);
     loadTasks(d.id);
+    loadWallet(d.id);
   }
 
   async function loadTasks(driverId: string) {
     setLoading(true);
     const res = await fetch(`/api/driver/tasks?driverId=${driverId}`);
     const data = await res.json();
-    setTasks(data.tasks || []);
+    const active = (data.tasks || []).filter((t: Task) =>
+      ['approved', 'accepted', 'on_road', 'on_process'].includes(t.status)
+    );
+    setTasks(active);
     setLoading(false);
   }
 
-  async function updateStatus(taskId: string, status: string) {
-    await fetch('/api/driver/update-status', {
+  async function loadWallet(driverId: string) {
+    try {
+      const res = await fetch(`/api/captain/wallet?driverId=${driverId}`);
+      const data = await res.json();
+      if (data.wallet) setWallet(data.wallet);
+    } catch {}
+  }
+
+  async function acceptTask(taskId: string) {
+    await fetch('/api/driver/accept-task', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ bookingId: taskId, status, driverId: driver?.id }),
+      body: JSON.stringify({ bookingId: taskId, driverId: driver?.id }),
+    });
+    if (driver) { loadTasks(driver.id); loadWallet(driver.id); }
+  }
+
+  async function onRoad(taskId: string) {
+    await fetch('/api/driver/on-road', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ bookingId: taskId, driverId: driver?.id }),
     });
     if (driver) loadTasks(driver.id);
+  }
+
+  async function completeTask(taskId: string) {
+    await fetch('/api/driver/complete-task', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ bookingId: taskId, driverId: driver?.id }),
+    });
+    if (driver) { loadTasks(driver.id); loadWallet(driver.id); }
   }
 
   // ── Driver picker ─────────────────────────────────────────
@@ -102,7 +132,15 @@ export default function DriverView() {
           <h1 className="text-xl font-bold text-slate-900 dark:text-white">مرحباً، {driver.name}</h1>
           <p className="text-sm text-slate-500 dark:text-slate-400">{tasks.length} مهمة نشطة</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
+          {wallet !== null && (
+            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-green-50 dark:bg-green-950 rounded-xl border border-green-200 dark:border-green-800">
+              <IcWallet className="w-4 h-4 text-green-600" />
+              <span className="text-sm font-bold text-green-700 dark:text-green-400" dir="ltr">
+                {wallet.balance.toLocaleString()} IQD
+              </span>
+            </div>
+          )}
           <button
             onClick={() => loadTasks(driver.id)}
             className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors"
@@ -111,7 +149,7 @@ export default function DriverView() {
             <IcRefresh className={`w-5 h-5 text-slate-500 dark:text-slate-400 ${loading ? 'animate-spin' : ''}`} />
           </button>
           <button
-            onClick={() => { setDriver(null); setTasks([]); }}
+            onClick={() => { setDriver(null); setTasks([]); setWallet(null); }}
             className="px-3 py-2 text-sm text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors"
           >
             تغيير
@@ -135,30 +173,36 @@ export default function DriverView() {
           <div key={task.id} className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm p-5">
             <div className="flex items-center justify-between mb-3">
               <span className="font-semibold text-slate-900 dark:text-white">{task.name}</span>
-              <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
-                task.status === 'approved' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'
-              }`}>
-                {task.status === 'approved' ? 'جديد' : 'جاري'}
-              </span>
+              <StatusBadge status={task.status} />
             </div>
             <div className="space-y-1.5 text-sm text-slate-600 dark:text-slate-300 mb-4">
-              <p className="flex items-center gap-2"><IcPhone className="w-4 h-4 text-slate-400 dark:text-slate-500 flex-shrink-0" /><span dir="ltr">{task.phone}</span></p>
-              <p className="flex items-center gap-2"><IcMapPin className="w-4 h-4 text-slate-400 dark:text-slate-500 flex-shrink-0" />{task.neighborhood}</p>
-              <p className="flex items-center gap-2"><IcCar className="w-4 h-4 text-slate-400 dark:text-slate-500 flex-shrink-0" />{task.carType} · {task.package}</p>
-              <p className="flex items-center gap-2"><IcClock className="w-4 h-4 text-slate-400 dark:text-slate-500 flex-shrink-0" />{task.date === 'today' ? 'اليوم' : 'غداً'} — {task.slot}</p>
+              <p className="flex items-center gap-2"><IcPhone className="w-4 h-4 text-slate-400 flex-shrink-0" /><span dir="ltr">{task.phone}</span></p>
+              <p className="flex items-center gap-2"><IcMapPin className="w-4 h-4 text-slate-400 flex-shrink-0" />{task.neighborhood}</p>
+              <p className="flex items-center gap-2"><IcCar className="w-4 h-4 text-slate-400 flex-shrink-0" />{task.carType} · {task.package}</p>
+              <p className="flex items-center gap-2"><IcClock className="w-4 h-4 text-slate-400 flex-shrink-0" />{task.date === 'today' ? 'اليوم' : 'غداً'} — {task.slot}</p>
             </div>
-            {task.status === 'approved' && (
+
+            {(task.status === 'approved') && (
               <button
-                onClick={() => updateStatus(task.id, 'on_process')}
+                onClick={() => acceptTask(task.id)}
                 className="w-full py-2.5 bg-brand-600 hover:bg-brand-700 text-white font-semibold rounded-xl transition-colors text-sm flex items-center justify-center gap-2"
               >
                 <IcPlay className="w-4 h-4" />
-                قبول المهمة — بدء التنفيذ
+                قبول المهمة
               </button>
             )}
-            {task.status === 'on_process' && (
+            {(task.status === 'accepted' || task.status === 'on_process') && (
               <button
-                onClick={() => updateStatus(task.id, 'completed')}
+                onClick={() => onRoad(task.id)}
+                className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl transition-colors text-sm flex items-center justify-center gap-2"
+              >
+                <IcNav className="w-4 h-4" />
+                أنا في الطريق
+              </button>
+            )}
+            {task.status === 'on_road' && (
+              <button
+                onClick={() => completeTask(task.id)}
                 className="w-full py-2.5 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-xl transition-colors text-sm flex items-center justify-center gap-2"
               >
                 <IcCheck className="w-4 h-4" />
@@ -170,4 +214,16 @@ export default function DriverView() {
       </div>
     </div>
   );
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const map: Record<string, { label: string; cls: string }> = {
+    approved:   { label: 'جديد',        cls: 'bg-green-100 text-green-700' },
+    accepted:   { label: 'مقبول',       cls: 'bg-brand-100 text-brand-700' },
+    on_process: { label: 'في الطريق',   cls: 'bg-blue-100 text-blue-700' },
+    on_road:    { label: 'في الطريق',   cls: 'bg-blue-100 text-blue-700' },
+    completed:  { label: 'مكتمل',       cls: 'bg-slate-100 text-slate-600' },
+  };
+  const { label, cls } = map[status] || { label: status, cls: 'bg-slate-100 text-slate-600' };
+  return <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${cls}`}>{label}</span>;
 }

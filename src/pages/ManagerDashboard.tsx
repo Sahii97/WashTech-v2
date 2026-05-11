@@ -1,13 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import { Check as IcCheck, X as IcX, RefreshCw as IcRefresh, ChevronDown } from 'lucide-react';
+import { Check as IcCheck, X as IcX, RefreshCw as IcRefresh, ChevronDown, DollarSign as IcDollar } from 'lucide-react';
 
 type Booking = {
   id: string; name: string; phone: string; neighborhood: string;
   carType: string; package: string; date: string; slot: string;
   status: string; driverId?: string; createdAt: string;
+  captainShare?: number; companyShare?: number; price?: number;
 };
 type Driver = { id: string; name: string; code: string };
-type Tab = 'pending' | 'approved' | 'rejected';
+type Tab = 'pending' | 'active' | 'completed' | 'rejected';
+
+const STATUS_LABELS: Record<string, string> = {
+  pending: 'انتظار', approved: 'مقبول', accepted: 'مقبول من الكابتن',
+  on_process: 'جاري', on_road: 'في الطريق', completed: 'مكتمل',
+  closed: 'مغلق', rejected: 'مرفوض',
+};
+
+const ACTIVE_STATUSES = ['approved', 'accepted', 'on_process', 'on_road'];
 
 export default function ManagerDashboard() {
   const [bookings, setBookings] = useState<Booking[]>([]);
@@ -38,16 +47,28 @@ export default function ManagerDashboard() {
   }
 
   const filtered = bookings.filter(b =>
-    tab === 'pending' ? b.status === 'pending' :
-    tab === 'approved' ? ['approved','on_process','completed'].includes(b.status) :
+    tab === 'pending'    ? b.status === 'pending' :
+    tab === 'active'     ? ACTIVE_STATUSES.includes(b.status) :
+    tab === 'completed'  ? ['completed', 'closed'].includes(b.status) :
     b.status === 'rejected'
   );
 
   const counts = {
-    pending: bookings.filter(b => b.status === 'pending').length,
-    approved: bookings.filter(b => ['approved','on_process','completed'].includes(b.status)).length,
-    rejected: bookings.filter(b => b.status === 'rejected').length,
+    pending:   bookings.filter(b => b.status === 'pending').length,
+    active:    bookings.filter(b => ACTIVE_STATUSES.includes(b.status)).length,
+    completed: bookings.filter(b => ['completed', 'closed'].includes(b.status)).length,
+    rejected:  bookings.filter(b => b.status === 'rejected').length,
   };
+
+  const totalRevenue   = bookings.filter(b => ['completed','closed'].includes(b.status)).reduce((s, b) => s + (b.price || 0), 0);
+  const companyRevenue = bookings.filter(b => ['completed','closed'].includes(b.status)).reduce((s, b) => s + (b.companyShare || 0), 0);
+
+  const TABS: { key: Tab; label: string; color: string }[] = [
+    { key: 'pending',   label: 'قيد الانتظار',  color: 'text-amber-600' },
+    { key: 'active',    label: 'نشط',            color: 'text-blue-600' },
+    { key: 'completed', label: 'مكتمل',          color: 'text-green-600' },
+    { key: 'rejected',  label: 'مرفوض',          color: 'text-red-600' },
+  ];
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
@@ -62,20 +83,41 @@ export default function ManagerDashboard() {
         </button>
       </header>
 
-      {/* Stats */}
-      <div className="grid grid-cols-3 gap-4 p-4 max-w-4xl mx-auto">
-        {(['pending','approved','rejected'] as Tab[]).map(t => (
+      {/* Revenue summary */}
+      {totalRevenue > 0 && (
+        <div className="max-w-4xl mx-auto px-4 pt-4">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-4 flex items-center gap-4 flex-wrap">
+            <div className="w-9 h-9 bg-green-100 rounded-xl flex items-center justify-center">
+              <IcDollar className="w-5 h-5 text-green-600" />
+            </div>
+            <div className="flex gap-6 flex-wrap text-sm">
+              <div>
+                <p className="text-slate-500 dark:text-slate-400 text-xs">إجمالي الإيرادات</p>
+                <p className="font-bold text-slate-900 dark:text-white" dir="ltr">{totalRevenue.toLocaleString()} IQD</p>
+              </div>
+              <div>
+                <p className="text-slate-500 dark:text-slate-400 text-xs">حصة الشركة (30%)</p>
+                <p className="font-bold text-green-600" dir="ltr">{companyRevenue.toLocaleString()} IQD</p>
+              </div>
+              <div>
+                <p className="text-slate-500 dark:text-slate-400 text-xs">حصة الكباتن (70%)</p>
+                <p className="font-bold text-blue-600" dir="ltr">{(totalRevenue - companyRevenue).toLocaleString()} IQD</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Stats tabs */}
+      <div className="grid grid-cols-4 gap-3 p-4 max-w-4xl mx-auto">
+        {TABS.map(t => (
           <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={`bg-white dark:bg-slate-800 rounded-xl border p-4 text-center transition-all ${tab === t ? 'border-brand-500 shadow-sm' : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'}`}
+            key={t.key}
+            onClick={() => setTab(t.key)}
+            className={`bg-white dark:bg-slate-800 rounded-xl border p-3 text-center transition-all ${tab === t.key ? 'border-brand-500 shadow-sm' : 'border-slate-200 dark:border-slate-700 hover:border-slate-300'}`}
           >
-            <div className={`text-2xl font-bold ${t === 'pending' ? 'text-amber-600' : t === 'approved' ? 'text-green-600' : 'text-red-600'}`}>
-              {counts[t]}
-            </div>
-            <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-              {t === 'pending' ? 'قيد الانتظار' : t === 'approved' ? 'مقبول' : 'مرفوض'}
-            </div>
+            <div className={`text-2xl font-bold ${t.color}`}>{counts[t.key]}</div>
+            <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{t.label}</div>
           </button>
         ))}
       </div>
@@ -100,6 +142,11 @@ export default function ManagerDashboard() {
                 <p className="text-sm font-medium text-slate-700 dark:text-slate-200 mt-1">
                   {b.date === 'today' ? 'اليوم' : 'غداً'} — {b.slot}
                 </p>
+                {b.price && b.price > 0 && (
+                  <p className="text-xs text-green-600 dark:text-green-400 mt-1 font-mono">
+                    {b.price.toLocaleString()} IQD · كابتن {b.captainShare?.toLocaleString()} · شركة {b.companyShare?.toLocaleString()}
+                  </p>
+                )}
                 <p className="text-xs text-slate-400 dark:text-slate-500 mt-1 font-mono">#{b.id.slice(-8)}</p>
               </div>
 
@@ -134,19 +181,18 @@ export default function ManagerDashboard() {
 
 function StatusBadge({ status }: { status: string }) {
   const cls: Record<string, string> = {
-    pending: 'bg-amber-100 text-amber-700',
-    approved: 'bg-green-100 text-green-700',
-    rejected: 'bg-red-100 text-red-700',
+    pending:    'bg-amber-100 text-amber-700',
+    approved:   'bg-green-100 text-green-700',
+    accepted:   'bg-brand-100 text-brand-700',
+    rejected:   'bg-red-100 text-red-700',
     on_process: 'bg-blue-100 text-blue-700',
-    completed: 'bg-slate-100 text-slate-600',
-  };
-  const labels: Record<string, string> = {
-    pending: 'انتظار', approved: 'مقبول', rejected: 'مرفوض',
-    on_process: 'جاري', completed: 'مكتمل',
+    on_road:    'bg-indigo-100 text-indigo-700',
+    completed:  'bg-slate-100 text-slate-600',
+    closed:     'bg-slate-100 text-slate-500',
   };
   return (
     <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${cls[status] || 'bg-slate-100 text-slate-600'}`}>
-      {labels[status] || status}
+      {STATUS_LABELS[status] || status}
     </span>
   );
 }

@@ -2,11 +2,14 @@ import React, { useState } from 'react';
 import { Search as IcSearch } from 'lucide-react';
 
 const STATUS_AR: Record<string, { label: string; color: string }> = {
-  pending:    { label: 'قيد الانتظار',     color: 'bg-amber-100 text-amber-700' },
-  approved:   { label: 'مقبول',            color: 'bg-green-100 text-green-700' },
-  rejected:   { label: 'مرفوض',            color: 'bg-red-100 text-red-700' },
+  pending:    { label: 'قيد المراجعة',      color: 'bg-amber-100 text-amber-700' },
+  approved:   { label: 'تمت الموافقة',      color: 'bg-green-100 text-green-700' },
+  accepted:   { label: 'الكابتن جاهز',      color: 'bg-brand-100 text-brand-700' },
+  rejected:   { label: 'مرفوض',             color: 'bg-red-100 text-red-700' },
   on_process: { label: 'الكابتن في الطريق', color: 'bg-blue-100 text-blue-700' },
-  completed:  { label: 'مكتمل',            color: 'bg-slate-100 text-slate-700' },
+  on_road:    { label: 'الكابتن في الطريق', color: 'bg-blue-100 text-blue-700' },
+  completed:  { label: 'اكتملت الخدمة',    color: 'bg-teal-100 text-teal-700' },
+  closed:     { label: 'مغلق',              color: 'bg-slate-100 text-slate-600' },
 };
 
 export default function TrackPage() {
@@ -115,7 +118,7 @@ export default function TrackPage() {
                       <span className="font-medium text-slate-800 dark:text-slate-200">{b.date === 'today' ? 'اليوم' : 'غداً'} {b.slot}</span>
                     </div>
                   </div>
-                  {b.status === 'on_process' && (
+                  {(b.status === 'on_process' || b.status === 'on_road') && (
                     <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-700 flex items-center gap-2 text-blue-600">
                       <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
                       <span className="text-sm font-medium">الكابتن في طريقه إليك</span>
