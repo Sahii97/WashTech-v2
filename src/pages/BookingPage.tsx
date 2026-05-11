@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { t, Lang } from '../translations';
-import { IcSearch, IcChevronDown } from '../icons';
+import { Search as IcSearch, ChevronDown as IcChevronDown } from 'lucide-react';
 
 type Step = 1 | 2 | 3;
 type Status = 'idle' | 'submitting' | 'success' | 'error';

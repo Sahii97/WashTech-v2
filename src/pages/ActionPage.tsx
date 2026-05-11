@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { IcCar, IcCheck, IcX, IcPlay, IcWarning } from '../icons';
+import { Car as IcCar, Check as IcCheck, X as IcX, Play as IcPlay, AlertTriangle as IcWarning } from 'lucide-react';
 
 type Act = 'approve' | 'reject' | 'accept';
 

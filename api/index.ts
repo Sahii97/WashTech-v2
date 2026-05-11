@@ -184,7 +184,7 @@ app.delete('/api/admin/driver/:id', async (req, res) => {
 // ── Bookings ──────────────────────────────────────────────────
 app.post('/api/bookings', async (req, res) => {
   try {
-    const booking = { ...req.body, status: 'pending', createdAt: new Date().toISOString() };
+    const booking = { ...req.body, phone: normalizePhone(req.body.phone || ''), status: 'pending', createdAt: new Date().toISOString() };
     const docRef = await addDoc(collection(db, 'bookings'), booking);
     const id = docRef.id;
     // Await before res.json — Vercel kills the function after responding
@@ -559,10 +559,10 @@ app.get('/api/track', async (req, res) => {
   if (!phone) return res.status(400).json({ error: 'Phone required' });
   try {
     const snap = await getDocs(collection(db, 'bookings'));
-    const clean = (p: string) => p.replace(/\s+/g, '');
+    const normalizedQuery = normalizePhone(phone);
     const bookings = snap.docs
       .map(d => ({ id: d.id, ...d.data() as any }))
-      .filter(b => clean(b.phone || '') === clean(phone))
+      .filter(b => normalizePhone(b.phone || '') === normalizedQuery)
       .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
     res.json({ bookings });
   } catch { res.status(500).json({ error: 'Failed' }); }

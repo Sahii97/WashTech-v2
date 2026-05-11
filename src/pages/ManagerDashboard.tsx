@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { IcCheck, IcX, IcRefresh } from '../icons';
+import { Check as IcCheck, X as IcX, RefreshCw as IcRefresh } from 'lucide-react';
 
 type Booking = {
   id: string; name: string; phone: string; neighborhood: string;

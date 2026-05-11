@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { IcSearch } from '../icons';
+import { Search as IcSearch } from 'lucide-react';
 
 const STATUS_AR: Record<string, { label: string; color: string }> = {
   pending:    { label: 'قيد الانتظار',  color: 'bg-amber-100 text-amber-700' },

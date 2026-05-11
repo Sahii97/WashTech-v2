@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { IcCar, IcPhone, IcMapPin, IcClock, IcCheck, IcPlay, IcRefresh } from '../icons';
+import { Car as IcCar, Phone as IcPhone, MapPin as IcMapPin, Clock as IcClock, Check as IcCheck, Play as IcPlay, RefreshCw as IcRefresh } from 'lucide-react';
 
 type Task = {
   id: string; name: string; phone: string; neighborhood: string;
