@@ -22,7 +22,7 @@ const db = getFirestore(fbApp, process.env.FIREBASE_DATABASE_ID || 'ai-studio-ae
 const WASENDER_TOKEN = process.env.WASENDER_API_TOKEN || '';
 const MANAGER_PHONE  = process.env.MANAGER_PHONE      || '+9647809471576';
 const N8N_WEBHOOK    = process.env.N8N_WEBHOOK_URL    || '';
-const APP_URL        = process.env.APP_URL             || 'https://washtech-v2.vercel.app';
+const APP_URL        = process.env.APP_URL             || 'https://wash-tech-v2.vercel.app';
 
 const DEFAULT_SLOTS = [
   '09:00 AM','10:00 AM','11:00 AM','12:00 PM','01:00 PM',
@@ -84,9 +84,10 @@ async function getTemplates(): Promise<NotificationTemplates> {
 // ── Notifications ─────────────────────────────────────────────
 function normalizePhone(phone: string): string {
   const clean = phone.replace(/[\s\-()]/g, '');
-  if (/^07\d{8}$/.test(clean))      return '+964' + clean.slice(1); // 07xxxxxxxx → +9647xxxxxxxx
-  if (/^9647\d{8}$/.test(clean))    return '+' + clean;
-  if (/^\+/.test(clean))            return clean;
+  if (/^07\d{9}$/.test(clean))       return '+964' + clean.slice(1); // 07xxxxxxxxx (11 digits) → +9647xxxxxxxxx
+  if (/^9647\d{9}$/.test(clean))     return '+' + clean;
+  if (/^\+9647\d{9}$/.test(clean))   return clean;
+  if (/^\+/.test(clean))             return clean;
   return '+' + clean;
 }
 
@@ -173,8 +174,9 @@ app.post('/api/admin/create-driver', async (req, res) => {
   const { name, code, phone } = req.body;
   if (!name || !code) return res.status(400).json({ error: 'Name and code required' });
   const id = `d${Date.now()}`;
-  await setDoc(doc(db, 'drivers', id), { name, code, phone: phone || '' });
-  res.json({ success: true, driver: { id, name, code, phone: phone || '' } });
+  const normalizedPhone = phone ? normalizePhone(phone) : '';
+  await setDoc(doc(db, 'drivers', id), { name, code, phone: normalizedPhone });
+  res.json({ success: true, driver: { id, name, code, phone: normalizedPhone } });
 });
 app.delete('/api/admin/driver/:id', async (req, res) => {
   await deleteDoc(doc(db, 'drivers', req.params.id));
@@ -324,18 +326,24 @@ app.post('/api/driver/update-status', async (req, res) => {
   try {
     await updateDoc(doc(db, 'bookings', bookingId), { status, updatedAt: new Date().toISOString() });
 
-    // When driver accepts → notify customer (awaited before responding)
+    // When captain accepts → notify customer AND manager
     if (status === 'on_process' && driverId) {
-      const snap = await getDocs(collection(db, 'bookings'));
-      const booking = snap.docs.find(d => d.id === bookingId)?.data() as any;
+      const bDoc = await getDoc(doc(db, 'bookings', bookingId));
+      const booking = bDoc.exists() ? (bDoc.data() as any) : null;
       const driverDoc = await getDoc(doc(db, 'drivers', driverId));
-      const driver = driverDoc.exists() ? (driverDoc.data() as any) : { name: 'السائق' };
+      const captain = driverDoc.exists() ? (driverDoc.data() as any) : { name: 'الكابتن' };
+      const vars = {
+        name: booking?.name || '', phone: booking?.phone || '',
+        driverName: captain.name, slot: booking?.slot || '',
+      };
       try {
-        await notify('driver_accepted', {
-          name: booking?.name || '', phone: booking?.phone || '',
-          driverName: driver.name, slot: booking?.slot || '',
-        }, booking?.phone || '');
-      } catch (e) { console.error('[notify driver_accepted]', e); }
+        await notify('driver_accepted', vars, booking?.phone || '');
+      } catch (e) { console.error('[notify driver_accepted→customer]', e); }
+      try {
+        await sendWhatsApp(MANAGER_PHONE,
+          `✅ الكابتن ${captain.name} قبل مهمة العميل *${booking?.name || ''}* وهو في الطريق إليه الآن.`
+        );
+      } catch (e) { console.error('[notify captain_accepted→manager]', e); }
     }
 
     res.json({ success: true });

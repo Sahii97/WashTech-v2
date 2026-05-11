@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Check as IcCheck, X as IcX, RefreshCw as IcRefresh } from 'lucide-react';
+import { Check as IcCheck, X as IcX, RefreshCw as IcRefresh, ChevronDown } from 'lucide-react';
 
 type Booking = {
   id: string; name: string; phone: string; neighborhood: string;
@@ -50,15 +50,15 @@ export default function ManagerDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
       {/* Header */}
-      <header className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between">
+      <header className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 px-6 py-4 flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-slate-900">لوحة المدير</h1>
-          <p className="text-sm text-slate-500">{bookings.length} حجز إجمالي</p>
+          <h1 className="text-xl font-bold text-slate-900 dark:text-white">لوحة المدير</h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400">{bookings.length} حجز إجمالي</p>
         </div>
-        <button onClick={load} className="p-2 hover:bg-slate-100 rounded-xl transition-colors" title="تحديث">
-          <IcRefresh className={`w-5 h-5 text-slate-500 ${loading ? 'animate-spin' : ''}`} />
+        <button onClick={load} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors" title="تحديث">
+          <IcRefresh className={`w-5 h-5 text-slate-500 dark:text-slate-400 ${loading ? 'animate-spin' : ''}`} />
         </button>
       </header>
 
@@ -68,12 +68,12 @@ export default function ManagerDashboard() {
           <button
             key={t}
             onClick={() => setTab(t)}
-            className={`bg-white rounded-xl border p-4 text-center transition-all ${tab === t ? 'border-brand-500 shadow-sm' : 'border-slate-200 hover:border-slate-300'}`}
+            className={`bg-white dark:bg-slate-800 rounded-xl border p-4 text-center transition-all ${tab === t ? 'border-brand-500 shadow-sm' : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'}`}
           >
             <div className={`text-2xl font-bold ${t === 'pending' ? 'text-amber-600' : t === 'approved' ? 'text-green-600' : 'text-red-600'}`}>
               {counts[t]}
             </div>
-            <div className="text-xs text-slate-500 mt-0.5">
+            <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
               {t === 'pending' ? 'قيد الانتظار' : t === 'approved' ? 'مقبول' : 'مرفوض'}
             </div>
           </button>
@@ -83,35 +83,33 @@ export default function ManagerDashboard() {
       {/* Bookings list */}
       <div className="max-w-4xl mx-auto px-4 pb-10 space-y-3">
         {filtered.length === 0 && (
-          <div className="bg-white rounded-2xl border border-slate-200 p-10 text-center text-slate-400">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-10 text-center text-slate-400 dark:text-slate-500">
             لا توجد حجوزات
           </div>
         )}
         {filtered.map(b => (
-          <div key={b.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+          <div key={b.id} className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm p-5">
             <div className="flex items-start justify-between gap-4 flex-wrap">
               <div>
                 <div className="flex items-center gap-2 mb-1">
-                  <span className="font-semibold text-slate-900">{b.name}</span>
+                  <span className="font-semibold text-slate-900 dark:text-white">{b.name}</span>
                   <StatusBadge status={b.status} />
                 </div>
-                <p className="text-sm text-slate-500">{b.phone} · {b.neighborhood}</p>
-                <p className="text-sm text-slate-500">{b.carType} · {b.package}</p>
-                <p className="text-sm font-medium text-slate-700 mt-1">
+                <p className="text-sm text-slate-500 dark:text-slate-400">{b.phone} · {b.neighborhood}</p>
+                <p className="text-sm text-slate-500 dark:text-slate-400">{b.carType} · {b.package}</p>
+                <p className="text-sm font-medium text-slate-700 dark:text-slate-200 mt-1">
                   {b.date === 'today' ? 'اليوم' : 'غداً'} — {b.slot}
                 </p>
-                <p className="text-xs text-slate-400 mt-1 font-mono">#{b.id.slice(-8)}</p>
+                <p className="text-xs text-slate-400 dark:text-slate-500 mt-1 font-mono">#{b.id.slice(-8)}</p>
               </div>
 
               {b.status === 'pending' && (
                 <div className="flex flex-col gap-2 min-w-[160px]">
-                  <select
-                    className="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                  <DriverSelect
+                    drivers={drivers}
                     value={selectedDrivers[b.id] || drivers[0]?.id || ''}
-                    onChange={e => setSelectedDrivers(p => ({ ...p, [b.id]: e.target.value }))}
-                  >
-                    {drivers.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                  </select>
+                    onChange={id => setSelectedDrivers(p => ({ ...p, [b.id]: id }))}
+                  />
                   <button
                     onClick={() => action(b.id, 'approve')}
                     className="w-full py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold rounded-lg transition-colors flex items-center justify-center gap-1.5"
@@ -120,7 +118,7 @@ export default function ManagerDashboard() {
                   </button>
                   <button
                     onClick={() => action(b.id, 'reject')}
-                    className="w-full py-2 border border-red-300 text-red-600 hover:bg-red-50 text-sm font-semibold rounded-lg transition-colors flex items-center justify-center gap-1.5"
+                    className="w-full py-2 border border-red-300 text-red-600 hover:bg-red-50 dark:hover:bg-red-950 text-sm font-semibold rounded-lg transition-colors flex items-center justify-center gap-1.5"
                   >
                     <IcX className="w-4 h-4" /> رفض
                   </button>
@@ -150,5 +148,33 @@ function StatusBadge({ status }: { status: string }) {
     <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${cls[status] || 'bg-slate-100 text-slate-600'}`}>
       {labels[status] || status}
     </span>
+  );
+}
+
+function DriverSelect({ drivers, value, onChange }: {
+  drivers: Driver[], value: string, onChange: (id: string) => void
+}) {
+  const [open, setOpen] = useState(false);
+  const selected = drivers.find(d => d.id === value);
+  return (
+    <div className="relative">
+      <button type="button" onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center justify-between px-3 py-2 text-sm border border-slate-200 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-700 text-slate-900 dark:text-white hover:border-blue-400 transition-colors">
+        <span>{selected?.name || 'اختر كابتن'}</span>
+        <ChevronDown size={14} className={`text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && (
+        <div className="absolute z-10 w-full mt-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-xl shadow-lg overflow-hidden">
+          {drivers.map(d => (
+            <button key={d.id} type="button"
+              onClick={() => { onChange(d.id); setOpen(false); }}
+              className={`w-full px-3 py-2.5 text-right text-sm hover:bg-blue-50 dark:hover:bg-slate-700 transition-colors ${value === d.id ? 'text-blue-600 font-semibold' : 'text-slate-900 dark:text-white'}`}
+            >
+              {d.name}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

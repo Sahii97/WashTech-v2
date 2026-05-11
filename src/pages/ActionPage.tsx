@@ -56,15 +56,15 @@ export default function ActionPage() {
   }
 
   const cfg: Record<string, { title: string; btn: string; color: string; Icon: React.FC<{ className?: string }> }> = {
-    approve: { title: 'قبول الحجز',  btn: 'قبول وإرسال للسائق',       color: 'bg-green-600 hover:bg-green-700', Icon: IcCheck },
-    reject:  { title: 'رفض الحجز',   btn: 'رفض وإشعار العميل',         color: 'bg-red-500  hover:bg-red-600',   Icon: IcX },
-    accept:  { title: 'قبول المهمة', btn: 'قبول المهمة وإشعار العميل', color: 'bg-blue-600 hover:bg-blue-700',  Icon: IcPlay },
+    approve: { title: 'قبول الحجز',  btn: 'قبول وإرسال للكابتن',        color: 'bg-green-600 hover:bg-green-700', Icon: IcCheck },
+    reject:  { title: 'رفض الحجز',   btn: 'رفض وإشعار العميل',          color: 'bg-red-500  hover:bg-red-600',   Icon: IcX },
+    accept:  { title: 'قبول المهمة', btn: 'قبول المهمة وإشعار العميل',  color: 'bg-blue-600 hover:bg-blue-700',  Icon: IcPlay },
   };
   const c = cfg[act];
 
   return (
-    <div dir="rtl" className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 max-w-md w-full">
+    <div dir="rtl" className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-4">
+      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-6 max-w-md w-full">
 
         {/* Header */}
         <div className="flex items-center gap-3 mb-6">
@@ -72,8 +72,8 @@ export default function ActionPage() {
               <IcCar className="w-5 h-5 text-brand-600" />
             </div>
           <div>
-            <p className="font-bold text-slate-900">WashTech</p>
-            <p className="text-sm text-slate-500">{c?.title || 'إجراء'}</p>
+            <p className="font-bold text-slate-900 dark:text-white">WashTech</p>
+            <p className="text-sm text-slate-500 dark:text-slate-400">{c?.title || 'إجراء'}</p>
           </div>
         </div>
 
@@ -81,7 +81,7 @@ export default function ActionPage() {
         {loading && (
           <div className="text-center py-10">
             <div className="w-8 h-8 border-2 border-brand-600 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-            <p className="text-sm text-slate-400">جاري التحميل...</p>
+            <p className="text-sm text-slate-400 dark:text-slate-500">جاري التحميل...</p>
           </div>
         )}
 
@@ -106,15 +106,15 @@ export default function ActionPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
             </div>
-            <p className="text-slate-900 font-bold text-lg">{result}</p>
-            <p className="text-slate-500 text-sm mt-2">تم الإرسال عبر واتساب ✓</p>
+            <p className="text-slate-900 dark:text-white font-bold text-lg">{result}</p>
+            <p className="text-slate-500 dark:text-slate-400 text-sm mt-2">تم الإرسال عبر واتساب ✓</p>
           </div>
         )}
 
         {/* Booking & action */}
         {!loading && !error && !done && booking && (
           <>
-            <div className="bg-slate-50 rounded-xl p-4 mb-5 space-y-2.5 text-sm">
+            <div className="bg-slate-50 dark:bg-slate-700 rounded-xl p-4 mb-5 space-y-2.5 text-sm">
               {([
                 ['العميل',  booking.name],
                 ['الهاتف',  booking.phone],
@@ -124,19 +124,19 @@ export default function ActionPage() {
                 ['الحالة',  STATUS_AR[booking.status] || booking.status],
               ] as [string, string][]).map(([label, val]) => (
                 <div key={label} className="flex justify-between items-center">
-                  <span className="text-slate-500">{label}</span>
-                  <span className="font-medium text-slate-800" dir={label === 'الهاتف' ? 'ltr' : 'rtl'}>{val}</span>
+                  <span className="text-slate-500 dark:text-slate-400">{label}</span>
+                  <span className="font-medium text-slate-800 dark:text-slate-200" dir={label === 'الهاتف' ? 'ltr' : 'rtl'}>{val}</span>
                 </div>
               ))}
             </div>
 
             {act === 'approve' && drivers.length > 0 && (
               <div className="mb-4">
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">اختر السائق</label>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-1.5">اختر الكابتن</label>
                 <select
                   value={driverId}
                   onChange={e => setDriverId(e.target.value)}
-                  className="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white"
+                  className="w-full px-3 py-2.5 border border-slate-300 dark:border-slate-600 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white dark:bg-slate-700 dark:text-white"
                 >
                   {drivers.map((d: any) => (
                     <option key={d.id} value={d.id}>{d.name}{d.phone ? ` — ${d.phone}` : ''}</option>
@@ -146,8 +146,8 @@ export default function ActionPage() {
             )}
 
             {act === 'approve' && drivers.length === 0 && (
-              <p className="text-amber-600 text-sm mb-4 bg-amber-50 rounded-xl p-3">
-                ⚠️ لا يوجد سائقون. أضف سائقاً من لوحة الإدارة أولاً.
+              <p className="text-amber-600 text-sm mb-4 bg-amber-50 dark:bg-amber-950 rounded-xl p-3">
+                ⚠️ لا يوجد كباتن. أضف كابتناً من لوحة الإدارة أولاً.
               </p>
             )}
 
