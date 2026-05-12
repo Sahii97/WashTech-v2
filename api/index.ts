@@ -681,33 +681,48 @@ app.post('/api/admin/notification-templates', async (req, res) => {
 });
 
 // ── Test notifications ────────────────────────────────────────
-const DUMMY_VARS: Record<EventKey, (to: string) => Record<string, string>> = {
-  new_booking:       to => ({ id: 'TEST1', name: 'محمد أحمد', phone: to, neighborhood: 'عنكاوة', carType: 'سيدان', package: 'غسيل كامل', date: 'اليوم', slot: '10:00 AM', approveLink: `${APP_URL}/action?id=TEST1&act=approve`, rejectLink: `${APP_URL}/action?id=TEST1&act=reject` }),
-  booking_approved:  to => ({ name: 'محمد أحمد', phone: to, neighborhood: 'عنكاوة', slot: '10:00 AM', driverName: 'علي', driverPhone: to, acceptLink: `${APP_URL}/action?id=TEST1&act=accept` }),
-  driver_accepted:   to => ({ name: 'محمد أحمد', phone: to, driverName: 'علي', slot: '10:00 AM' }),
-  booking_rejected:  to => ({ name: 'محمد أحمد', phone: to }),
-  captain_on_road:   to => ({ name: 'محمد أحمد', phone: to, driverName: 'علي', slot: '10:00 AM' }),
-  booking_completed: to => ({ name: 'محمد أحمد', phone: to, amount: '25,000' }),
-};
 const EVENT_RECIPIENTS: Record<EventKey, (to: string) => string> = {
-  new_booking: _ => MANAGER_PHONE,
-  booking_approved: to => to,
-  driver_accepted: to => to,
-  booking_rejected: to => to,
-  captain_on_road: to => to,
+  new_booking:       _  => MANAGER_PHONE,
+  booking_approved:  to => to,
+  driver_accepted:   to => to,
+  booking_rejected:  to => to,
+  captain_on_road:   to => to,
   booking_completed: to => to,
 };
+const EVENT_AR_LABELS: Record<EventKey, string> = {
+  new_booking:       'حجز جديد → المدير',
+  booking_approved:  'موافقة → الكابتن',
+  driver_accepted:   'قبول الكابتن → العميل',
+  booking_rejected:  'رفض الحجز → العميل',
+  captain_on_road:   'الكابتن في الطريق → العميل',
+  booking_completed: 'اكتمال الخدمة → العميل',
+};
+
+async function getDummyVars(event: EventKey, to: string): Promise<Record<string, string>> {
+  const base: Record<string, string> = { id: 'A8F3', name: 'محمد أحمد', phone: to, neighborhood: 'عنكاوة', carType: 'سيدان', package: 'غسيل قياسي', date: 'اليوم', slot: '10:00 AM', driverName: 'علي محمد', driverPhone: to, amount: '25,000' };
+  if (event === 'new_booking') {
+    base.approveLink = await createShortLink(`${APP_URL}/action?id=TEST_APPROVE&act=approve`);
+    base.rejectLink  = await createShortLink(`${APP_URL}/action?id=TEST_REJECT&act=reject`);
+  }
+  if (event === 'booking_approved') {
+    base.acceptLink = await createShortLink(`${APP_URL}/action?id=TEST_ACCEPT&act=accept`);
+  }
+  return base;
+}
 
 app.post('/api/admin/test-notification', async (req, res) => {
   const { event, testPhone } = req.body as { event: EventKey; testPhone?: string };
   if (!event) return res.status(400).json({ error: 'Missing event' });
   const to = testPhone || MANAGER_PHONE;
   try {
-    const vars = DUMMY_VARS[event](to);
+    const vars = await getDummyVars(event, to);
     const templates = await getTemplates();
-    const preview = templates[event]?.enabled ? applyTemplate(templates[event].template, vars) : '(disabled)';
-    await notify(event, vars, EVENT_RECIPIENTS[event](to));
-    res.json({ success: true, sentTo: EVENT_RECIPIENTS[event](to), preview });
+    const cfg = templates[event];
+    if (!cfg?.enabled) return res.json({ success: false, error: 'هذا الإشعار معطّل' });
+    const text = applyTemplate(cfg.template, vars);
+    const recipient = EVENT_RECIPIENTS[event](to);
+    await sendWhatsApp(recipient, text);
+    res.json({ success: true, sentTo: recipient, preview: text });
   } catch { res.status(500).json({ error: 'Failed' }); }
 });
 
@@ -715,15 +730,25 @@ app.post('/api/admin/test-all-notifications', async (req, res) => {
   const { testPhone } = req.body as { testPhone?: string };
   const to = testPhone || MANAGER_PHONE;
   const events: EventKey[] = ['new_booking','booking_approved','driver_accepted','booking_rejected','captain_on_road','booking_completed'];
-  const results: string[] = [];
+  const templates = await getTemplates();
+  const results: { event: string; ok: boolean; label: string }[] = [];
   for (const event of events) {
+    const cfg = templates[event];
+    if (!cfg?.enabled) {
+      results.push({ event, ok: false, label: `${EVENT_AR_LABELS[event]} — معطّل` });
+      continue;
+    }
     try {
-      await notify(event, DUMMY_VARS[event](to), EVENT_RECIPIENTS[event](to));
-      results.push(`✓ ${event}`);
-    } catch (e) { results.push(`✗ ${event}: ${e}`); }
-    await new Promise(r => setTimeout(r, 600));
+      const vars = await getDummyVars(event, to);
+      await sendWhatsApp(EVENT_RECIPIENTS[event](to), applyTemplate(cfg.template, vars));
+      results.push({ event, ok: true, label: EVENT_AR_LABELS[event] });
+    } catch (e) {
+      results.push({ event, ok: false, label: `${EVENT_AR_LABELS[event]}: خطأ` });
+    }
+    await new Promise(r => setTimeout(r, 300));
   }
-  res.json({ success: true, sentTo: to, results });
+  const allOk = results.every(r => r.ok);
+  res.json({ success: allOk, sentTo: to, results });
 });
 
 // ── Full cycle simulation ────────────────────────────────────

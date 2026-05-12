@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Car as IcCar, Check as IcCheck, X as IcX, Play as IcPlay, Navigation as IcNav, Flag as IcFlag, AlertTriangle as IcWarning } from 'lucide-react';
+import { Car as IcCar, Check as IcCheck, X as IcX, Play as IcPlay, Navigation as IcNav, Flag as IcFlag, AlertTriangle as IcWarning, ChevronDown } from 'lucide-react';
 
 type Act = 'approve' | 'reject' | 'accept' | 'on_road' | 'complete';
 
@@ -141,18 +141,7 @@ export default function ActionPage() {
             </div>
 
             {act === 'approve' && drivers.length > 0 && (
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-1.5">اختر الكابتن</label>
-                <select
-                  value={driverId}
-                  onChange={e => setDriverId(e.target.value)}
-                  className="w-full px-3 py-2.5 border border-slate-300 dark:border-slate-600 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white dark:bg-slate-700 dark:text-white"
-                >
-                  {drivers.map((d: any) => (
-                    <option key={d.id} value={d.id}>{d.name}{d.phone ? ` — ${d.phone}` : ''}</option>
-                  ))}
-                </select>
-              </div>
+              <DriverDropdown drivers={drivers} value={driverId} onChange={setDriverId} />
             )}
 
             {act === 'approve' && drivers.length === 0 && (
@@ -172,6 +161,60 @@ export default function ActionPage() {
               </button>
             )}
           </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function DriverDropdown({ drivers, value, onChange }: { drivers: any[]; value: string; onChange: (id: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const selected = drivers.find((d: any) => d.id === value);
+  return (
+    <div className="mb-4">
+      <label className="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-1.5">اختر الكابتن</label>
+      <div className="relative">
+        <button
+          type="button"
+          onClick={() => setOpen(o => !o)}
+          className="w-full flex items-center justify-between px-4 py-3 border border-slate-200 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-700 text-slate-900 dark:text-white hover:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-500/30 transition-all text-sm"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 bg-brand-100 dark:bg-brand-900 rounded-full flex items-center justify-center flex-shrink-0">
+              <span className="text-brand-700 dark:text-brand-300 font-bold text-sm">
+                {selected?.name?.charAt(0) || '?'}
+              </span>
+            </div>
+            <div className="text-right">
+              <p className="font-semibold text-sm">{selected?.name || 'اختر كابتن'}</p>
+              {selected?.phone && <p className="text-xs text-slate-400 dark:text-slate-500 font-mono" dir="ltr">{selected.phone}</p>}
+            </div>
+          </div>
+          <ChevronDown size={16} className={`text-slate-400 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
+        </button>
+
+        {open && (
+          <div className="absolute z-20 w-full mt-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-2xl shadow-xl overflow-hidden">
+            {drivers.map((d: any) => (
+              <button
+                key={d.id}
+                type="button"
+                onClick={() => { onChange(d.id); setOpen(false); }}
+                className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors text-right ${value === d.id ? 'bg-brand-50 dark:bg-brand-950' : ''}`}
+              >
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${value === d.id ? 'bg-brand-200 dark:bg-brand-800' : 'bg-slate-100 dark:bg-slate-700'}`}>
+                  <span className={`font-bold text-sm ${value === d.id ? 'text-brand-700 dark:text-brand-300' : 'text-slate-600 dark:text-slate-400'}`}>
+                    {d.name.charAt(0)}
+                  </span>
+                </div>
+                <div className="flex-1">
+                  <p className={`text-sm font-semibold ${value === d.id ? 'text-brand-700 dark:text-brand-300' : 'text-slate-900 dark:text-white'}`}>{d.name}</p>
+                  {d.phone && <p className="text-xs text-slate-400 dark:text-slate-500 font-mono" dir="ltr">{d.phone}</p>}
+                </div>
+                {value === d.id && <IcCheck size={14} className="text-brand-600 dark:text-brand-400 flex-shrink-0" />}
+              </button>
+            ))}
+          </div>
         )}
       </div>
     </div>
