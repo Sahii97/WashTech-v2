@@ -91,12 +91,19 @@ function genCode(): string {
   return Math.random().toString(36).slice(2, 8).toUpperCase();
 }
 async function createShortLink(url: string): Promise<string> {
-  let code = genCode();
-  const existing = await getDoc(doc(db, 'links', code));
-  if (existing.exists()) code = genCode();
-  const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
-  await setDoc(doc(db, 'links', code), { url, createdAt: new Date().toISOString(), expiresAt, used: false });
-  return `${APP_URL}/go/${code}`;
+  try {
+    let code = genCode();
+    try {
+      const existing = await getDoc(doc(db, 'links', code));
+      if (existing.exists()) code = genCode();
+    } catch { code = genCode(); }
+    const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
+    await setDoc(doc(db, 'links', code), { url, createdAt: new Date().toISOString(), expiresAt, used: false });
+    return `${APP_URL}/go/${code}`;
+  } catch (e) {
+    console.error('[shortlink] fallback to long URL:', e);
+    return url; // graceful fallback — long URL still works
+  }
 }
 
 // ── Notification templates ────────────────────────────────────
@@ -123,6 +130,48 @@ async function getTemplates(): Promise<NotificationTemplates> {
   return { ...DEFAULT_TEMPLATES, ...saved };
 }
 
+// ── Automation rules ──────────────────────────────────────────
+export type RecipientType = 'manager' | 'captain' | 'customer' | 'custom';
+export interface AutomationRule {
+  id: string;
+  enabled: boolean;
+  trigger: EventKey;
+  recipientType: RecipientType;
+  customPhone?: string;
+}
+
+const DEFAULT_AUTOMATIONS: AutomationRule[] = [
+  { id: 'r_new_booking',       enabled: true, trigger: 'new_booking',       recipientType: 'manager'  },
+  { id: 'r_booking_approved',  enabled: true, trigger: 'booking_approved',  recipientType: 'captain'  },
+  { id: 'r_driver_accepted',   enabled: true, trigger: 'driver_accepted',   recipientType: 'customer' },
+  { id: 'r_booking_rejected',  enabled: true, trigger: 'booking_rejected',  recipientType: 'customer' },
+  { id: 'r_captain_on_road',   enabled: true, trigger: 'captain_on_road',   recipientType: 'customer' },
+  { id: 'r_booking_completed', enabled: true, trigger: 'booking_completed', recipientType: 'customer' },
+];
+
+async function getAutomations(): Promise<AutomationRule[]> {
+  const saved = await getSetting<AutomationRule[] | null>('automations', null);
+  if (!saved) return DEFAULT_AUTOMATIONS;
+  // Merge saved with defaults (keep default IDs updated, append custom rules)
+  const savedMap = new Map(saved.map(r => [r.id, r]));
+  const merged = DEFAULT_AUTOMATIONS.map(d => savedMap.get(d.id) ?? d);
+  const custom = saved.filter(r => !DEFAULT_AUTOMATIONS.find(d => d.id === r.id));
+  return [...merged, ...custom];
+}
+async function saveAutomations(rules: AutomationRule[]) {
+  await setSetting('automations', rules);
+}
+
+function resolveRecipient(rule: AutomationRule, vars: Record<string, string>): string | null {
+  switch (rule.recipientType) {
+    case 'manager':  return MANAGER_PHONE;
+    case 'captain':  return vars.driverPhone || null;
+    case 'customer': return vars.phone || null;
+    case 'custom':   return rule.customPhone || null;
+    default:         return null;
+  }
+}
+
 // ── Phone normalization ───────────────────────────────────────
 function normalizePhone(phone: string): string {
   const clean = phone.replace(/[\s\-()]/g, '');
@@ -146,17 +195,27 @@ async function sendWhatsApp(to: string, text: string): Promise<void> {
   } catch (e) { console.error('[WhatsApp]', e); }
 }
 
-async function notify(event: EventKey, vars: Record<string, string>, to: string): Promise<void> {
+async function notify(event: EventKey, vars: Record<string, string>, fallbackTo: string): Promise<void> {
   if (N8N_WEBHOOK) {
     try {
       await fetch(N8N_WEBHOOK, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ event, ...vars }) });
     } catch (e) { console.error('[n8n]', e); }
     return;
   }
-  const templates = await getTemplates();
+  const [templates, automations] = await Promise.all([getTemplates(), getAutomations()]);
   const cfg = templates[event];
   if (!cfg?.enabled) return;
-  await sendWhatsApp(to, applyTemplate(cfg.template, vars));
+  const text = applyTemplate(cfg.template, vars);
+  const rules = automations.filter(r => r.trigger === event && r.enabled);
+  if (!rules.length) {
+    // Fallback: send to the provided phone if no rules match
+    await sendWhatsApp(fallbackTo, text);
+    return;
+  }
+  for (const rule of rules) {
+    const to = resolveRecipient(rule, vars) || fallbackTo;
+    await sendWhatsApp(to, text);
+  }
 }
 
 // ── Captain wallet helpers ────────────────────────────────────
@@ -669,6 +728,47 @@ app.post('/api/admin/reset', async (_req, res) => {
   } catch { res.status(500).json({ error: 'Reset failed' }); }
 });
 
+// ── Automation rules CRUD ─────────────────────────────────────
+app.get('/api/admin/automations', async (_req, res) => {
+  res.json({ automations: await getAutomations() });
+});
+
+app.post('/api/admin/automations', async (req, res) => {
+  const { automations } = req.body;
+  if (!Array.isArray(automations)) return res.status(400).json({ error: 'automations must be array' });
+  await saveAutomations(automations);
+  res.json({ success: true });
+});
+
+app.post('/api/admin/automations/add', async (req, res) => {
+  const { trigger, recipientType, customPhone } = req.body;
+  if (!trigger || !recipientType) return res.status(400).json({ error: 'Missing fields' });
+  const automations = await getAutomations();
+  const newRule: AutomationRule = {
+    id: `r_custom_${Date.now()}`,
+    enabled: true, trigger, recipientType, customPhone: customPhone || undefined,
+  };
+  await saveAutomations([...automations, newRule]);
+  res.json({ success: true, rule: newRule });
+});
+
+app.patch('/api/admin/automations/:id', async (req, res) => {
+  const { id } = req.params;
+  const automations = await getAutomations();
+  const idx = automations.findIndex(r => r.id === id);
+  if (idx === -1) return res.status(404).json({ error: 'Rule not found' });
+  automations[idx] = { ...automations[idx], ...req.body, id };
+  await saveAutomations(automations);
+  res.json({ success: true, rule: automations[idx] });
+});
+
+app.delete('/api/admin/automations/:id', async (req, res) => {
+  const { id } = req.params;
+  const automations = await getAutomations();
+  await saveAutomations(automations.filter(r => r.id !== id));
+  res.json({ success: true });
+});
+
 // ── Notification templates ────────────────────────────────────
 app.get('/api/admin/notification-templates', async (_req, res) => {
   res.json({ templates: await getTemplates() });
@@ -774,20 +874,20 @@ app.post('/api/admin/simulate-cycle', async (req, res) => {
       const rejectLink  = await createShortLink(`${APP_URL}/action?id=${testId}&act=reject`);
       await notify('new_booking', { id: testId.slice(-5), name: 'عميل تجريبي', phone: customerPhone, neighborhood: 'عنكاوة', carType: 'سيدان', package: 'قياسي', date: 'اليوم', slot: '10:00 AM', approveLink, rejectLink }, MANAGER_PHONE);
       steps.push({ label: `إشعار المدير ✓ → ${MANAGER_PHONE}`, ok: true });
-    } catch { steps.push({ label: 'فشل إشعار المدير', ok: false }); }
+    } catch (e) { steps.push({ label: `فشل إشعار المدير: ${String(e).slice(0, 80)}`, ok: false }); }
     await updateDoc(doc(db, 'bookings', testId), { status: 'approved', driverId: driver.id, updatedAt: new Date().toISOString() });
     steps.push({ label: `وافق المدير — الكابتن: ${driver.name}`, ok: true });
     try {
       const acceptLink = await createShortLink(`${APP_URL}/action?id=${testId}&act=accept`);
       await notify('booking_approved', { name: 'عميل تجريبي', phone: customerPhone, neighborhood: 'عنكاوة', slot: '10:00 AM', driverName: driver.name, driverPhone: driver.phone || '', acceptLink }, driver.phone || MANAGER_PHONE);
       steps.push({ label: `إشعار الكابتن ✓ → ${driver.phone || MANAGER_PHONE}`, ok: true });
-    } catch { steps.push({ label: 'فشل إشعار الكابتن', ok: false }); }
+    } catch (e) { steps.push({ label: `فشل إشعار الكابتن: ${String(e).slice(0, 80)}`, ok: false }); }
     await updateDoc(doc(db, 'bookings', testId), { status: 'accepted', updatedAt: new Date().toISOString() });
     steps.push({ label: 'قبل الكابتن المهمة', ok: true });
     try {
       await notify('driver_accepted', { name: 'عميل تجريبي', phone: customerPhone, driverName: driver.name, slot: '10:00 AM' }, customerPhone);
       steps.push({ label: `إشعار العميل ✓ → ${customerPhone}`, ok: true });
-    } catch { steps.push({ label: 'فشل إشعار العميل', ok: false }); }
+    } catch (e) { steps.push({ label: `فشل إشعار العميل: ${String(e).slice(0, 80)}`, ok: false }); }
     await deleteDoc(doc(db, 'bookings', testId));
     testId = '';
     steps.push({ label: 'تم حذف بيانات الاختبار', ok: true });
