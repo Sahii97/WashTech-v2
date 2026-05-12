@@ -3,7 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate, NavLink } from 'react-router-do
 import { Moon, Sun } from 'lucide-react';
 import BookingPage from './pages/BookingPage';
 import ManagerDashboard from './pages/ManagerDashboard';
-import DriverView from './pages/DriverView';
+import CaptainView from './pages/CaptainView';
 import AdminDashboard from './pages/AdminDashboard';
 import ActionPage from './pages/ActionPage';
 import TrackPage from './pages/TrackPage';
@@ -63,7 +63,8 @@ export default function App() {
       <Routes>
         <Route path="/" element={<BookingPage />} />
         <Route path="/manager" element={<ManagerDashboard />} />
-        <Route path="/driver" element={<DriverView />} />
+        <Route path="/driver" element={<CaptainView />} />
+        <Route path="/captain" element={<CaptainView />} />
         <Route path="/admin" element={<AdminDashboard />} />
         <Route path="/action" element={<ActionPage />} />
         <Route path="/track" element={<TrackPage />} />

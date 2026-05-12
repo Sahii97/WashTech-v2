@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { t, Lang } from '../translations';
 import { Search as IcSearch, ChevronDown as IcChevronDown } from 'lucide-react';
+import SearchableDropdown from '../components/SearchableDropdown';
 
 type Step = 1 | 2 | 3;
 type Status = 'idle' | 'submitting' | 'success' | 'error';
@@ -216,10 +217,14 @@ export default function BookingPage() {
                   {form.neighborhood && <span className="self-center text-xs text-green-600 font-medium">✓ {form.neighborhood}</span>}
                 </div>
                 {gpsError && <p className="text-xs text-amber-600 mb-2">{gpsError}</p>}
-                <select className={input} value={form.neighborhood} onChange={e => set('neighborhood', e.target.value)}>
-                  <option value="">—</option>
-                  {(neighborhoods.length ? neighborhoods : tr.neighborhoods).map(n => <option key={n} value={n}>{n}</option>)}
-                </select>
+                <SearchableDropdown
+                  id="neighborhood-select"
+                  options={(neighborhoods.length ? neighborhoods : tr.neighborhoods).map(n => ({ value: n, label: n }))}
+                  value={form.neighborhood}
+                  onChange={v => set('neighborhood', v)}
+                  placeholder="— اختر المنطقة —"
+                  searchPlaceholder="بحث عن منطقة..."
+                />
               </Field>
               <Field label={tr.carType}>
                 <div className="grid grid-cols-2 gap-2">

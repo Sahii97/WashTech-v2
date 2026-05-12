@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Check as IcCheck, X as IcX, RefreshCw as IcRefresh, ChevronDown, DollarSign as IcDollar } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Check as IcCheck, X as IcX, RefreshCw as IcRefresh, ChevronDown, DollarSign as IcDollar, User as IcUser } from 'lucide-react';
 
 type Booking = {
   id: string; name: string; phone: string; neighborhood: string;
@@ -24,8 +24,14 @@ export default function ManagerDashboard() {
   const [tab, setTab] = useState<Tab>('pending');
   const [selectedDrivers, setSelectedDrivers] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    // Auto-refresh every 10s to catch new pending bookings
+    intervalRef.current = setInterval(() => load(), 10000);
+    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
+  }, []);
 
   async function load() {
     setLoading(true);
@@ -60,8 +66,10 @@ export default function ManagerDashboard() {
     rejected:  bookings.filter(b => b.status === 'rejected').length,
   };
 
-  const totalRevenue   = bookings.filter(b => ['completed','closed'].includes(b.status)).reduce((s, b) => s + (b.price || 0), 0);
-  const companyRevenue = bookings.filter(b => ['completed','closed'].includes(b.status)).reduce((s, b) => s + (b.companyShare || 0), 0);
+  // Use financials sub-object (set by the API on completion)
+  const completedB = bookings.filter(b => ['completed','closed'].includes(b.status));
+  const totalRevenue   = completedB.reduce((s: number, b: any) => s + (b.financials?.totalAmount  || b.price || 0), 0);
+  const companyRevenue = completedB.reduce((s: number, b: any) => s + (b.financials?.companyShare || b.companyShare || 0), 0);
 
   const TABS: { key: Tab; label: string; color: string }[] = [
     { key: 'pending',   label: 'قيد الانتظار',  color: 'text-amber-600' },
@@ -142,11 +150,17 @@ export default function ManagerDashboard() {
                 <p className="text-sm font-medium text-slate-700 dark:text-slate-200 mt-1">
                   {b.date === 'today' ? 'اليوم' : 'غداً'} — {b.slot}
                 </p>
-                {b.price && b.price > 0 && (
-                  <p className="text-xs text-green-600 dark:text-green-400 mt-1 font-mono">
-                    {b.price.toLocaleString()} IQD · كابتن {b.captainShare?.toLocaleString()} · شركة {b.companyShare?.toLocaleString()}
+                {b.driverId && (
+                  <p className="text-xs text-blue-600 dark:text-blue-400 mt-1 flex items-center gap-1">
+                    <IcUser className="w-3 h-3" />
+                    {drivers.find(d => d.id === b.driverId)?.name || 'كابتن'}
                   </p>
                 )}
+                {(() => { const amt = (b as any).financials?.totalAmount || b.price || 0; return amt > 0 ? (
+                  <p className="text-xs text-green-600 dark:text-green-400 mt-1 font-mono">
+                    {amt.toLocaleString()} IQD · كابتن {((b as any).financials?.captainShare || b.captainShare || 0).toLocaleString()} · شركة {((b as any).financials?.companyShare || b.companyShare || 0).toLocaleString()}
+                  </p>
+                ) : null; })()}
                 <p className="text-xs text-slate-400 dark:text-slate-500 mt-1 font-mono">#{b.id.slice(-8)}</p>
               </div>
 

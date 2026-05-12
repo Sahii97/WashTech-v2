@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { LayoutGrid, Bell, Car, Users, MapPin, Settings, Play, Trash2, Plus, Check, RefreshCw, Moon, Sun, Send, TrendingUp, Pencil, X, ChevronDown } from 'lucide-react';
+import { LayoutGrid, Bell, Car, Users, MapPin, Settings, Play, Trash2, Plus, Check, RefreshCw, Moon, Sun, Send, TrendingUp, Pencil, X, ChevronDown, Terminal } from 'lucide-react';
+import MessageCard from '../components/MessageCard';
 
 function timeAgo(iso: string): string {
   const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
@@ -67,12 +68,12 @@ const RECIPIENT_LABELS: Record<RecipientType, string> = {
 };
 
 const NAV: { key: Section; label: string; icon: React.ReactNode }[] = [
-  { key: 'dashboard', label: 'الرئيسية',  icon: <LayoutGrid size={20} strokeWidth={1.5} /> },
-  { key: 'workflow',  label: 'الرسائل',   icon: <Bell       size={20} strokeWidth={1.5} /> },
-  { key: 'drivers',   label: 'الكباتن',   icon: <Car        size={20} strokeWidth={1.5} /> },
-  { key: 'managers',  label: 'المدراء',   icon: <Users      size={20} strokeWidth={1.5} /> },
-  { key: 'locations', label: 'المناطق',   icon: <MapPin     size={20} strokeWidth={1.5} /> },
-  { key: 'settings',  label: 'الإعدادات', icon: <Settings   size={20} strokeWidth={1.5} /> },
+  { key: 'dashboard', label: 'الرئيسية',          icon: <LayoutGrid size={20} strokeWidth={1.5} /> },
+  { key: 'workflow',  label: 'الرسائل',           icon: <Bell       size={20} strokeWidth={1.5} /> },
+  { key: 'drivers',   label: 'الكباتن',           icon: <Car        size={20} strokeWidth={1.5} /> },
+  { key: 'managers',  label: 'المدراء',           icon: <Users      size={20} strokeWidth={1.5} /> },
+  { key: 'locations', label: 'المناطق',           icon: <MapPin     size={20} strokeWidth={1.5} /> },
+  { key: 'settings',  label: 'اعدادات المطور',   icon: <Terminal   size={20} strokeWidth={1.5} /> },
 ];
 
 const inp = 'w-full px-3 py-2.5 border border-slate-200 dark:border-slate-600 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 bg-white dark:bg-slate-700 dark:text-white dark:placeholder-slate-400 transition';
@@ -95,19 +96,25 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean
   );
 }
 
-// ── WhatsApp-style editor with rendered preview ───────────────
+// ── WhatsApp-style editor with rendered MessageCard preview ────────
 function WaEditor({ value, onChange, rows, textareaRef }: {
   value: string; onChange: (v: string) => void;
   rows?: number; textareaRef?: React.Ref<HTMLTextAreaElement>;
 }) {
+  const now = new Date().toLocaleTimeString('ar', { hour: '2-digit', minute: '2-digit' });
   return (
     <div className="rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-600">
-      <div className="bg-[#e7fdd8] dark:bg-[#1a3a2a] px-4 py-3 border-b border-slate-200 dark:border-slate-600">
-        <p className="text-[10px] text-slate-400 dark:text-slate-500 mb-1.5 font-medium uppercase tracking-wide">معاينة · بقيم تجريبية</p>
-        <div className="text-sm text-slate-800 dark:text-slate-100 whitespace-pre-wrap font-sans leading-relaxed break-words min-h-[40px]">
-          {renderPreview(value) || <span className="text-slate-400 dark:text-slate-500 italic text-xs">اكتب الرسالة أدناه...</span>}
-        </div>
+      {/* WhatsApp-style preview */}
+      <div className="bg-[#e5ddd5] dark:bg-[#0c1317] px-3 py-3">
+        <p className="text-[10px] text-slate-500 dark:text-slate-400 mb-2 font-medium uppercase tracking-wide">معاينة الرسالة</p>
+        <MessageCard
+          from="WashTech"
+          body={renderPreview(value) || 'اكتب الرسالة أدناه...'}
+          time={now}
+          compact={false}
+        />
       </div>
+      {/* Editor */}
       <div className="bg-[#f0f2f5] dark:bg-slate-800 flex items-end gap-2 px-3 py-2">
         <textarea
           ref={textareaRef}
@@ -753,7 +760,10 @@ export default function AdminDashboard() {
           {/* ── Settings ───────────────────────────────── */}
           {section === 'settings' && (
             <div className="space-y-5">
-              <h2 className="font-bold text-slate-900 dark:text-white text-lg">الإعدادات</h2>
+              <div className="flex items-center gap-2">
+                <Terminal size={20} className="text-slate-500 dark:text-slate-400" />
+                <h2 className="font-bold text-slate-900 dark:text-white text-lg">اعدادات المطور</h2>
+              </div>
 
               {/* ── Automation CRUD ── */}
               <div>

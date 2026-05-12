@@ -33,7 +33,7 @@ const DEFAULT_NEIGHBORHOODS = [
   'عنكاوة','عدن','آزادي','بحركة','ريزان','كويسنجق',
   'ولي','بناسلاوة','زرگوس','سامي عبدالرحمن','إسكان',
 ];
-const DEFAULT_DRIVERS = [{ id: 'd1', name: 'Ali', code: '1234', phone: '+9647809471576' }];
+const DEFAULT_CAPTAINS = [{ id: 'd1', name: 'Ali', code: '1234', phone: '+9647809471576' }];
 
 // ── Booking state machine ─────────────────────────────────────
 export type BookingStatus =
@@ -72,19 +72,21 @@ async function getManagers() {
   const snap = await getDocs(collection(db, 'managers'));
   return snap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
 }
-async function getDrivers() {
+async function getCaptains() {
   const snap = await getDocs(collection(db, 'drivers'));
   if (snap.empty) {
-    for (const d of DEFAULT_DRIVERS) {
+    for (const d of DEFAULT_CAPTAINS) {
       await setDoc(doc(db, 'drivers', d.id), {
         name: d.name, code: d.code, phone: d.phone,
         wallet: { balance: 0, totalEarned: 0, totalWithdrawn: 0 },
       });
     }
-    return DEFAULT_DRIVERS;
+    return DEFAULT_CAPTAINS;
   }
   return snap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
 }
+// Alias for backward-compat
+const getDrivers = getCaptains;
 
 // ── Short links ───────────────────────────────────────────────
 function genCode(): string {
@@ -291,10 +293,25 @@ app.delete('/api/admin/neighborhoods/:name', async (req, res) => {
   res.json({ success: true });
 });
 
-// ── Drivers ───────────────────────────────────────────────────
-app.get('/api/drivers', async (_req, res) => {
-  res.json({ drivers: await getDrivers() });
+// ── Captains (drivers collection kept for Firestore compat) ───
+app.get('/api/captains', async (_req, res) => {
+  res.json({ captains: await getCaptains(), drivers: await getCaptains() });
 });
+app.get('/api/drivers', async (_req, res) => {
+  res.json({ drivers: await getCaptains() });
+});
+app.post('/api/admin/create-captain', async (req, res) => {
+  const { name, code, phone } = req.body;
+  if (!name || !code) return res.status(400).json({ error: 'Name and code required' });
+  const id = `d${Date.now()}`;
+  const normalizedPhone = phone ? normalizePhone(phone) : '';
+  await setDoc(doc(db, 'drivers', id), {
+    name, code, phone: normalizedPhone,
+    wallet: { balance: 0, totalEarned: 0, totalWithdrawn: 0 },
+  });
+  res.json({ success: true, captain: { id, name, code, phone: normalizedPhone } });
+});
+// Alias
 app.post('/api/admin/create-driver', async (req, res) => {
   const { name, code, phone } = req.body;
   if (!name || !code) return res.status(400).json({ error: 'Name and code required' });
@@ -305,6 +322,10 @@ app.post('/api/admin/create-driver', async (req, res) => {
     wallet: { balance: 0, totalEarned: 0, totalWithdrawn: 0 },
   });
   res.json({ success: true, driver: { id, name, code, phone: normalizedPhone } });
+});
+app.delete('/api/admin/captain/:id', async (req, res) => {
+  await deleteDoc(doc(db, 'drivers', req.params.id));
+  res.json({ success: true });
 });
 app.delete('/api/admin/driver/:id', async (req, res) => {
   await deleteDoc(doc(db, 'drivers', req.params.id));
@@ -587,15 +608,33 @@ app.post('/api/action', async (req, res) => {
   }
 });
 
-// ── Driver login & tasks ──────────────────────────────────────
+// ── Captain login & tasks ─────────────────────────────────────
+app.post('/api/captain/login', async (req, res) => {
+  const { code } = req.body;
+  const captains = await getCaptains();
+  const captain = captains.find((d: any) => d.code === code);
+  if (captain) res.json({ success: true, captain, driver: captain });
+  else res.status(401).json({ error: 'كود غير صحيح' });
+});
 app.post('/api/driver/login', async (req, res) => {
   const { code } = req.body;
-  const drivers = await getDrivers();
-  const driver = drivers.find((d: any) => d.code === code);
-  if (driver) res.json({ success: true, driver });
+  const captains = await getCaptains();
+  const captain = captains.find((d: any) => d.code === code);
+  if (captain) res.json({ success: true, driver: captain, captain });
   else res.status(401).json({ error: 'Invalid code' });
 });
 
+app.get('/api/captain/tasks', async (req, res) => {
+  const { captainId, driverId } = req.query as any;
+  const id = captainId || driverId;
+  try {
+    const snap = await getDocs(collection(db, 'bookings'));
+    const tasks = snap.docs
+      .map(d => ({ id: d.id, ...d.data() as any }))
+      .filter(b => b.driverId === id && ['approved','accepted','on_road','on_process'].includes(b.status));
+    res.json({ tasks });
+  } catch { res.status(500).json({ error: 'Failed' }); }
+});
 app.get('/api/driver/tasks', async (req, res) => {
   const { driverId } = req.query;
   try {
@@ -683,18 +722,28 @@ app.post('/api/driver/complete-task', async (req, res) => {
   } catch (e) { res.status(500).json({ error: 'Failed' }); }
 });
 
-// Legacy update-status (DriverView uses this directly)
+// Legacy update-status — NOW with state machine guard
 app.post('/api/driver/update-status', async (req, res) => {
   const { bookingId, status, driverId } = req.body;
   try {
     const bookingRef = doc(db, 'bookings', bookingId);
     const bsnap = await getDoc(bookingRef);
-    const booking = bsnap.exists() ? (bsnap.data() as any) : {};
+    if (!bsnap.exists()) return res.status(404).json({ error: 'Booking not found' });
+    const booking = bsnap.data() as any;
+    // State machine guard
+    const currentStatus = booking.status || 'pending';
+    const allowed = ALLOWED_TRANSITIONS[currentStatus] || [];
+    if (!allowed.includes(status)) {
+      return res.status(409).json({ error: `لا يمكن الانتقال من ${currentStatus} إلى ${status}` });
+    }
+    // Captain ownership check
+    if (driverId && booking.driverId && booking.driverId !== driverId) {
+      return res.status(403).json({ error: 'غير مخوّل لتعديل هذه المهمة' });
+    }
     const now = new Date().toISOString();
-    const history = [...(booking.statusHistory || []), { status, at: now, by: 'driver' }];
+    const history = [...(booking.statusHistory || []), { status, at: now, by: 'captain' }];
     await updateDoc(bookingRef, { status, updatedAt: now, statusHistory: history });
-
-    if (status === 'on_process' && driverId) {
+    if ((status === 'on_process' || status === 'accepted') && driverId) {
       const driverDoc = await getDoc(doc(db, 'drivers', driverId));
       const captain = driverDoc.exists() ? (driverDoc.data() as any) : { name: 'الكابتن' };
       await notify('driver_accepted', {
@@ -716,7 +765,7 @@ app.post('/api/admin/reset', async (_req, res) => {
     await Promise.all(linkSnap.docs.map(d => deleteDoc(doc(db, 'links', d.id))));
     const driverSnap = await getDocs(collection(db, 'drivers'));
     await Promise.all(driverSnap.docs.map(d => deleteDoc(doc(db, 'drivers', d.id))));
-    for (const d of DEFAULT_DRIVERS) {
+    for (const d of DEFAULT_CAPTAINS) {
       await setDoc(doc(db, 'drivers', d.id), {
         name: d.name, code: d.code, phone: d.phone,
         wallet: { balance: 0, totalEarned: 0, totalWithdrawn: 0 },
@@ -851,16 +900,18 @@ app.post('/api/admin/test-all-notifications', async (req, res) => {
   res.json({ success: allOk, sentTo: to, results });
 });
 
-// ── Full cycle simulation ────────────────────────────────────
+// ── Full cycle simulation (all 5 transitions) ────────────────
 app.post('/api/admin/simulate-cycle', async (req, res) => {
   const { testPhone: rawPhone } = req.body;
   const customerPhone = rawPhone?.trim() ? normalizePhone(rawPhone.trim()) : MANAGER_PHONE;
   const steps: { label: string; ok: boolean }[] = [];
   let testId = '';
   try {
-    const drivers = await getDrivers();
-    if (!drivers.length) return res.status(400).json({ success: false, steps: [{ label: 'لا يوجد كباتن', ok: false }] });
-    const driver = drivers[0];
+    const captains = await getCaptains();
+    if (!captains.length) return res.status(400).json({ success: false, steps: [{ label: 'لا يوجد كباتن — أضف كابتناً أولاً', ok: false }] });
+    const captain = captains[0];
+
+    // Step 1 — Create booking (pending)
     const ref = await addDoc(collection(db, 'bookings'), {
       name: 'عميل تجريبي', phone: customerPhone, neighborhood: 'عنكاوة',
       carType: 'سيدان', package: 'قياسي', date: 'today', slot: '10:00 AM',
@@ -868,33 +919,58 @@ app.post('/api/admin/simulate-cycle', async (req, res) => {
       statusHistory: [{ status: 'pending', at: new Date().toISOString(), by: 'test' }],
     });
     testId = ref.id;
-    steps.push({ label: 'تم إنشاء الحجز التجريبي', ok: true });
+    steps.push({ label: '1/5 — تم إنشاء الحجز التجريبي (pending)', ok: true });
+
+    // Step 2 — Manager approves → notify captain
     try {
       const approveLink = await createShortLink(`${APP_URL}/action?id=${testId}&act=approve`);
       const rejectLink  = await createShortLink(`${APP_URL}/action?id=${testId}&act=reject`);
       await notify('new_booking', { id: testId.slice(-5), name: 'عميل تجريبي', phone: customerPhone, neighborhood: 'عنكاوة', carType: 'سيدان', package: 'قياسي', date: 'اليوم', slot: '10:00 AM', approveLink, rejectLink }, MANAGER_PHONE);
-      steps.push({ label: `إشعار المدير ✓ → ${MANAGER_PHONE}`, ok: true });
-    } catch (e) { steps.push({ label: `فشل إشعار المدير: ${String(e).slice(0, 80)}`, ok: false }); }
-    await updateDoc(doc(db, 'bookings', testId), { status: 'approved', driverId: driver.id, updatedAt: new Date().toISOString() });
-    steps.push({ label: `وافق المدير — الكابتن: ${driver.name}`, ok: true });
+      steps.push({ label: `2/5 — إشعار المدير (WhatsApp) → ${MANAGER_PHONE}`, ok: true });
+    } catch (e) { steps.push({ label: `2/5 — فشل إشعار المدير: ${String(e).slice(0, 60)}`, ok: false }); }
+    await updateDoc(doc(db, 'bookings', testId), { status: 'approved', driverId: captain.id, updatedAt: new Date().toISOString(), statusHistory: [{ status: 'pending', at: new Date().toISOString(), by: 'test' }, { status: 'approved', at: new Date().toISOString(), by: 'sim' }] });
+
+    // Step 3 — Captain accepts → notify customer
     try {
       const acceptLink = await createShortLink(`${APP_URL}/action?id=${testId}&act=accept`);
-      await notify('booking_approved', { name: 'عميل تجريبي', phone: customerPhone, neighborhood: 'عنكاوة', slot: '10:00 AM', driverName: driver.name, driverPhone: driver.phone || '', acceptLink }, driver.phone || MANAGER_PHONE);
-      steps.push({ label: `إشعار الكابتن ✓ → ${driver.phone || MANAGER_PHONE}`, ok: true });
-    } catch (e) { steps.push({ label: `فشل إشعار الكابتن: ${String(e).slice(0, 80)}`, ok: false }); }
+      await notify('booking_approved', { name: 'عميل تجريبي', phone: customerPhone, neighborhood: 'عنكاوة', slot: '10:00 AM', driverName: captain.name, driverPhone: captain.phone || '', acceptLink }, captain.phone || MANAGER_PHONE);
+      steps.push({ label: `3/5 — إشعار الكابتن (approved → accepted) → ${captain.phone || MANAGER_PHONE}`, ok: true });
+    } catch (e) { steps.push({ label: `3/5 — فشل إشعار الكابتن: ${String(e).slice(0, 60)}`, ok: false }); }
     await updateDoc(doc(db, 'bookings', testId), { status: 'accepted', updatedAt: new Date().toISOString() });
-    steps.push({ label: 'قبل الكابتن المهمة', ok: true });
     try {
-      await notify('driver_accepted', { name: 'عميل تجريبي', phone: customerPhone, driverName: driver.name, slot: '10:00 AM' }, customerPhone);
-      steps.push({ label: `إشعار العميل ✓ → ${customerPhone}`, ok: true });
-    } catch (e) { steps.push({ label: `فشل إشعار العميل: ${String(e).slice(0, 80)}`, ok: false }); }
+      await notify('driver_accepted', { name: 'عميل تجريبي', phone: customerPhone, driverName: captain.name, slot: '10:00 AM' }, customerPhone);
+      steps.push({ label: `3/5 — إشعار العميل (الكابتن قبل) → ${customerPhone}`, ok: true });
+    } catch (e) { steps.push({ label: `3/5 — فشل إشعار العميل: ${String(e).slice(0, 60)}`, ok: false }); }
+
+    // Step 4 — Captain on road → notify customer
+    await updateDoc(doc(db, 'bookings', testId), { status: 'on_road', updatedAt: new Date().toISOString() });
+    try {
+      await notify('captain_on_road', { name: 'عميل تجريبي', phone: customerPhone, driverName: captain.name, slot: '10:00 AM' }, customerPhone);
+      steps.push({ label: `4/5 — الكابتن في الطريق (on_road) → إشعار العميل`, ok: true });
+    } catch (e) { steps.push({ label: `4/5 — فشل إشعار الطريق: ${String(e).slice(0, 60)}`, ok: false }); }
+
+    // Step 5 — Captain completes → financials + notify
+    const totalAmount = 25000; // قياسي
+    const captainShare = Math.round(totalAmount * CAPTAIN_SHARE_PCT);
+    const companyShare = totalAmount - captainShare;
+    await updateDoc(doc(db, 'bookings', testId), {
+      status: 'completed', updatedAt: new Date().toISOString(),
+      financials: { totalAmount, captainShare, companyShare },
+    });
+    try {
+      await creditCaptainWallet(captain.id, captainShare, testId, 'حجز تجريبي');
+      await notify('booking_completed', { name: 'عميل تجريبي', phone: customerPhone, amount: totalAmount.toLocaleString('ar-IQ') }, customerPhone);
+      steps.push({ label: `5/5 — اكتمل الحجز (completed) — ${totalAmount.toLocaleString()} د.ع — محفظة الكابتن +${captainShare.toLocaleString()}`, ok: true });
+    } catch (e) { steps.push({ label: `5/5 — فشل الإكمال: ${String(e).slice(0, 60)}`, ok: false }); }
+
+    // Cleanup
     await deleteDoc(doc(db, 'bookings', testId));
     testId = '';
-    steps.push({ label: 'تم حذف بيانات الاختبار', ok: true });
-    res.json({ success: true, steps });
+    steps.push({ label: 'تم حذف بيانات الاختبار التجريبي', ok: true });
+    res.json({ success: steps.every(s => s.ok), steps });
   } catch (e) {
     if (testId) await deleteDoc(doc(db, 'bookings', testId)).catch(() => {});
-    steps.push({ label: 'فشل: ' + String(e), ok: false });
+    steps.push({ label: 'خطأ عام: ' + String(e), ok: false });
     res.json({ success: false, steps });
   }
 });

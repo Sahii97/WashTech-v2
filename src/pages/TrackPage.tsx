@@ -24,22 +24,21 @@ export default function TrackPage() {
     if (!phone.trim()) return;
     setLoading(true);
     setError('');
-    setSearched(false);
     try {
       const res = await fetch(`/api/track?phone=${encodeURIComponent(phone.trim())}`);
       const data = await res.json();
       if (data.error) { setError(data.error); setBookings([]); }
       else { setBookings(data.bookings || []); }
       setSearched(true);
-    } catch { setError('خطأ في الاتصال'); }
+    } catch { setError('خطأ في الاتصال — تأكد من الاتصال بالإنترنت'); }
     setLoading(false);
   }
 
   return (
-    <div dir="rtl" className="min-h-screen bg-slate-50 dark:bg-slate-950">
-      <header className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 px-4 py-4">
+    <div dir="rtl" className="min-h-[100dvh] bg-slate-50 dark:bg-slate-950 flex flex-col">
+      <header className="bg-white/90 dark:bg-slate-900/90 backdrop-blur border-b border-slate-200 dark:border-slate-700 px-4 py-4 sticky top-0 z-10">
         <div className="max-w-lg mx-auto flex items-center gap-3">
-          <a href="/" className="text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors">
+          <a href="/" className="text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors p-1">
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
@@ -51,7 +50,7 @@ export default function TrackPage() {
         </div>
       </header>
 
-      <main className="max-w-lg mx-auto p-4 pb-20">
+      <main className="flex-1 max-w-lg mx-auto w-full p-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
         <form onSubmit={search} className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm p-6 mb-4">
           <label className="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-1.5">رقم الهاتف</label>
           <div className="flex gap-2">
@@ -66,9 +65,11 @@ export default function TrackPage() {
             <button
               type="submit"
               disabled={loading}
-              className="px-5 py-2.5 bg-brand-600 hover:bg-brand-700 disabled:opacity-50 text-white font-semibold rounded-xl text-sm transition-colors"
+              className="px-5 py-2.5 bg-brand-600 hover:bg-brand-700 disabled:opacity-50 text-white font-semibold rounded-xl text-sm transition-colors min-w-[72px]"
             >
-              {loading ? '...' : 'بحث'}
+              {loading ? (
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mx-auto" />
+              ) : 'بحث'}
             </button>
           </div>
         </form>
