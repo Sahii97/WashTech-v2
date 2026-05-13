@@ -211,14 +211,14 @@ export default function ManagerDashboard() {
           {finOverview && (
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               {[
-                { label: 'إجمالي الإيرادات', val: finOverview.totalRevenue,   cls: 'text-slate-900 dark:text-white',       icon: <TrendingUp     className="w-4 h-4 text-green-500" /> },
-                { label: 'حصة الشركة',        val: finOverview.companyRevenue, cls: 'text-green-700 dark:text-green-400',   icon: <ArrowUpRight   className="w-4 h-4 text-green-500" /> },
-                { label: 'حصة الكباتن',       val: finOverview.captainPayouts, cls: 'text-blue-700 dark:text-blue-400',    icon: <ArrowDownLeft  className="w-4 h-4 text-blue-500"  /> },
-                { label: 'حجوزات مكتملة',     val: finOverview.completedCount, cls: 'text-slate-700 dark:text-slate-300',  icon: <IcCheck        className="w-4 h-4 text-slate-400"  />, noFormat: true },
+                { label: 'إجمالي الإيرادات', val: finOverview.totalRevenue   ?? 0, cls: 'text-slate-900 dark:text-white',       icon: <TrendingUp     className="w-4 h-4 text-green-500" /> },
+                { label: 'حصة الشركة',        val: finOverview.companyRevenue ?? 0, cls: 'text-green-700 dark:text-green-400',   icon: <ArrowUpRight   className="w-4 h-4 text-green-500" /> },
+                { label: 'حصة الكباتن',       val: finOverview.captainPayouts ?? 0, cls: 'text-blue-700 dark:text-blue-400',    icon: <ArrowDownLeft  className="w-4 h-4 text-blue-500"  /> },
+                { label: 'حجوزات مكتملة',     val: finOverview.completedCount ?? 0, cls: 'text-slate-700 dark:text-slate-300',  icon: <IcCheck        className="w-4 h-4 text-slate-400"  />, noFormat: true },
               ].map(s => (
                 <div key={s.label} className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-4">
                   <div className="flex items-center gap-1.5 mb-1">{s.icon}<p className="text-xs text-slate-500 dark:text-slate-400">{s.label}</p></div>
-                  <p className={`text-lg font-bold ${s.cls}`} dir="ltr">{(s as any).noFormat ? s.val : s.val.toLocaleString()}</p>
+                  <p className={`text-lg font-bold ${s.cls}`} dir="ltr">{(s as any).noFormat ? (s.val ?? 0) : (s.val ?? 0).toLocaleString()}</p>
                 </div>
               ))}
             </div>
@@ -247,15 +247,15 @@ export default function ManagerDashboard() {
                 <div className="flex gap-5 text-xs">
                   <div className="text-center">
                     <p className="text-slate-400 mb-0.5">الرصيد</p>
-                    <p className="font-bold text-green-600" dir="ltr">{c.balance.toLocaleString()}</p>
+                    <p className="font-bold text-green-600" dir="ltr">{(c.balance ?? 0).toLocaleString()}</p>
                   </div>
                   <div className="text-center">
                     <p className="text-slate-400 mb-0.5">مكتسب</p>
-                    <p className="font-bold text-blue-600" dir="ltr">{c.totalEarned.toLocaleString()}</p>
+                    <p className="font-bold text-blue-600" dir="ltr">{(c.totalEarned ?? 0).toLocaleString()}</p>
                   </div>
                   <div className="text-center">
                     <p className="text-slate-400 mb-0.5">مسحوب</p>
-                    <p className="font-bold text-red-500" dir="ltr">{c.totalWithdrawn.toLocaleString()}</p>
+                    <p className="font-bold text-red-500" dir="ltr">{(c.totalWithdrawn ?? 0).toLocaleString()}</p>
                   </div>
                 </div>
               </div>

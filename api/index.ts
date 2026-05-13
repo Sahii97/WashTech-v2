@@ -347,13 +347,25 @@ app.get('/api/captain/wallet', async (req, res) => {
   if (!driverId) return res.status(400).json({ error: 'Missing driverId' });
   try {
     const snap = await getDoc(doc(db, 'drivers', driverId as string));
-    if (!snap.exists()) return res.status(404).json({ error: 'Not found' });
-    const txSnap = await getDocs(collection(db, 'drivers', driverId as string, 'transactions'));
-    res.json({
-      wallet: (snap.data() as any).wallet || { balance: 0, totalEarned: 0, totalWithdrawn: 0 },
-      transactions: txSnap.docs.map(d => ({ id: d.id, ...d.data() })),
-    });
-  } catch { res.status(500).json({ error: 'Failed' }); }
+    if (!snap.exists()) {
+      // Return empty wallet instead of 404 — captain may be new
+      return res.json({ wallet: { balance: 0, totalEarned: 0, totalWithdrawn: 0 }, transactions: [] });
+    }
+    const wallet = (snap.data() as any).wallet || { balance: 0, totalEarned: 0, totalWithdrawn: 0 };
+    // Transactions are in a subcollection — fetch separately with graceful fallback
+    let transactions: any[] = [];
+    try {
+      const txSnap = await getDocs(collection(db, 'drivers', driverId as string, 'transactions'));
+      transactions = txSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    } catch (txErr) {
+      console.warn('[wallet] transactions fetch failed (non-fatal):', txErr);
+    }
+    res.json({ wallet, transactions });
+  } catch (e) {
+    console.error('[wallet]', e);
+    // Return safe fallback so frontend doesn't crash
+    res.json({ wallet: { balance: 0, totalEarned: 0, totalWithdrawn: 0 }, transactions: [] });
+  }
 });
 
 app.post('/api/captain/transaction', async (req, res) => {
