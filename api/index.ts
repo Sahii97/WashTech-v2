@@ -69,8 +69,13 @@ async function setSetting(key: string, value: any) {
   await setDoc(doc(db, 'settings', key), { value });
 }
 async function getManagers() {
-  const snap = await getDocs(collection(db, 'managers'));
-  return snap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
+  try {
+    const snap = await getDocs(collection(db, 'managers'));
+    return snap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
+  } catch (e) {
+    console.error('[getManagers] Firestore error:', e);
+    return [];
+  }
 }
 async function getCaptains() {
   const snap = await getDocs(collection(db, 'drivers'));
@@ -840,7 +845,11 @@ app.get('/api/admin/settings/:key', async (req, res) => {
   try {
     const snap = await getDoc(doc(db, 'settings', req.params.key));
     res.json(snap.exists() ? snap.data() : { value: null });
-  } catch { res.status(500).json({ error: 'Failed' }); }
+  } catch (e) {
+    console.error(`[settings GET ${req.params.key}]`, e);
+    // Always return a safe default — never 500 on a GET
+    res.json({ value: null });
+  }
 });
 
 app.post('/api/admin/settings/:key', async (req, res) => {
@@ -849,7 +858,10 @@ app.post('/api/admin/settings/:key', async (req, res) => {
   try {
     await setDoc(doc(db, 'settings', req.params.key), { value, updatedAt: new Date().toISOString() });
     res.json({ success: true });
-  } catch { res.status(500).json({ error: 'Failed' }); }
+  } catch (e) {
+    console.error(`[settings POST ${req.params.key}]`, e);
+    res.status(500).json({ error: 'Failed to save setting', detail: String(e).slice(0, 200) });
+  }
 });
 
 // ── Manager financial overview ─────────────────────────────────

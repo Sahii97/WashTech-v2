@@ -281,7 +281,7 @@ export default function AdminDashboard() {
   useEffect(() => { loadAll(); }, []);
 
   async function loadAll() {
-    const [d, b, s, n, m, t, a, fc, ac] = await Promise.all([
+    const [d, b, s, n, m, t, a] = await Promise.all([
       fetch('/api/drivers').then(r => r.json()),
       fetch('/api/bookings').then(r => r.json()),
       fetch('/api/slots').then(r => r.json()),
@@ -289,8 +289,6 @@ export default function AdminDashboard() {
       fetch('/api/admin/managers').then(r => r.json()),
       fetch('/api/admin/notification-templates').then(r => r.json()),
       fetch('/api/admin/automations').then(r => r.json()),
-      fetch('/api/admin/settings/finance_config').then(r => r.json()).catch(() => ({})),
-      fetch('/api/admin/settings/app_config').then(r => r.json()).catch(() => ({})),
     ]);
     setDrivers(d.drivers || []);
     setBookings(b.bookings || []);
@@ -299,12 +297,23 @@ export default function AdminDashboard() {
     setManagers(m.managers || []);
     if (t.templates) setTemplates({ ...DEFAULT_TEMPLATES, ...t.templates });
     if (a.automations) setAutomations(a.automations);
-    if (fc.value) {
-      const v = fc.value;
-      setFinConfig({ captainSharePct: Math.round((v.captainSharePct || 0.70) * 100), basic: v.packagePrices?.basic || 15000, standard: v.packagePrices?.standard || 25000, premium: v.packagePrices?.premium || 35000 });
-    }
-    if (ac.value) setAppConfig(prev => ({ ...prev, ...ac.value }));
   }
+
+  async function loadSettingsConfig() {
+    try {
+      const [fc, ac] = await Promise.all([
+        fetch('/api/admin/settings/finance_config').then(r => r.json()).catch(() => ({})),
+        fetch('/api/admin/settings/app_config').then(r => r.json()).catch(() => ({})),
+      ]);
+      if (fc?.value) {
+        const v = fc.value;
+        setFinConfig({ captainSharePct: Math.round((v.captainSharePct || 0.70) * 100), basic: v.packagePrices?.basic || 15000, standard: v.packagePrices?.standard || 25000, premium: v.packagePrices?.premium || 35000 });
+      }
+      if (ac?.value) setAppConfig(prev => ({ ...prev, ...ac.value }));
+    } catch {}
+  }
+
+  useEffect(() => { if (section === 'settings') loadSettingsConfig(); }, [section]);
 
   async function loadFinance() {
     setFinLoading(true);
