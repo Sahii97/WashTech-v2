@@ -243,6 +243,7 @@ export default function AdminDashboard() {
   const [adjForm,        setAdjForm]        = useState<{ captainId: string; type: 'adjustment'|'withdrawal'; amount: string; note: string }>({ captainId: '', type: 'adjustment', amount: '', note: '' });
   const [adjMsg,         setAdjMsg]         = useState('');
   const [adjLoading,     setAdjLoading]     = useState(false);
+  const [finLoading,     setFinLoading]     = useState(false);
 
   // Dynamic settings state
   const [finConfig,      setFinConfig]      = useState({ captainSharePct: 70, basic: 15000, standard: 25000, premium: 35000 });
@@ -306,6 +307,7 @@ export default function AdminDashboard() {
   }
 
   async function loadFinance() {
+    setFinLoading(true);
     try {
       const [ov, ca] = await Promise.all([
         fetch('/api/manager/finance/overview').then(r => r.json()),
@@ -315,8 +317,10 @@ export default function AdminDashboard() {
       setFinCaptains(ca.captains || []);
       if (ca.captains?.length) setAdjForm(p => ({ ...p, captainId: ca.captains[0].id }));
     } catch {}
+    setFinLoading(false);
   }
 
+  useEffect(() => { loadAll(); loadFinance(); }, []);
   useEffect(() => { if (section === 'finance') loadFinance(); }, [section]);
 
   async function submitAdjustment(e: React.FormEvent) {
@@ -829,8 +833,18 @@ export default function AdminDashboard() {
             <div className="space-y-5">
               <div className="flex items-center justify-between">
                 <h2 className="font-bold text-slate-900 dark:text-white text-lg flex items-center gap-2"><Wallet size={20} className="text-green-600" /> المالية</h2>
-                <button onClick={loadFinance} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors text-slate-400"><RefreshCw size={16} /></button>
+                <button onClick={loadFinance} disabled={finLoading} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors text-slate-400">
+                  <RefreshCw size={16} className={finLoading ? 'animate-spin' : ''} />
+                </button>
               </div>
+
+              {/* Loading state */}
+              {finLoading && !finOverview && (
+                <div className="flex flex-col items-center justify-center py-16 gap-3">
+                  <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                  <p className="text-sm text-slate-400 dark:text-slate-500">جاري تحميل البيانات المالية...</p>
+                </div>
+              )}
 
               {/* Overview cards */}
               {finOverview && (
