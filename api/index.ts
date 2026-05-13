@@ -92,15 +92,20 @@ const getDrivers = getCaptains;
 function genCode(): string {
   return Math.random().toString(36).slice(2, 8).toUpperCase();
 }
-async function createShortLink(url: string): Promise<string> {
+async function createShortLink(url: string, type: 'action' | 'track' = 'action'): Promise<string> {
   try {
     let code = genCode();
     try {
       const existing = await getDoc(doc(db, 'links', code));
       if (existing.exists()) code = genCode();
     } catch { code = genCode(); }
-    const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
-    await setDoc(doc(db, 'links', code), { url, createdAt: new Date().toISOString(), expiresAt, used: false });
+    // action links expire in 48h and are single-use; track links expire in 7 days and are multi-use
+    const expiryMs  = type === 'track' ? 7 * 24 * 60 * 60 * 1000 : 48 * 60 * 60 * 1000;
+    const expiresAt = new Date(Date.now() + expiryMs).toISOString();
+    await setDoc(doc(db, 'links', code), {
+      url, type, createdAt: new Date().toISOString(), expiresAt,
+      used: false, clicks: [],
+    });
     return `${APP_URL}/go/${code}`;
   } catch (e) {
     console.error('[shortlink] fallback to long URL:', e);
@@ -255,9 +260,13 @@ app.get('/go/:code', async (req, res) => {
     const snap = await getDoc(doc(db, 'links', code));
     if (!snap.exists()) return res.status(404).send('رابط غير صالح');
     const link = snap.data() as any;
-    if (link.used) return res.status(410).send('تم استخدام هذا الرابط مسبقاً');
     if (new Date(link.expiresAt) < new Date()) return res.status(410).send('انتهت صلاحية الرابط');
-    await updateDoc(doc(db, 'links', code), { used: true, usedAt: new Date().toISOString() });
+    const isTrack = link.type === 'track';
+    if (!isTrack && link.used) return res.status(410).send('تم استخدام هذا الرابط مسبقاً');
+    const clickEntry = { at: new Date().toISOString(), ua: (req.headers['user-agent'] || '').slice(0, 200) };
+    const updateData: any = { clicks: [...(link.clicks || []), clickEntry] };
+    if (!isTrack) { updateData.used = true; updateData.usedAt = new Date().toISOString(); }
+    await updateDoc(doc(db, 'links', code), updateData);
     res.redirect(link.url);
   } catch { res.status(500).send('Server error'); }
 });
@@ -369,6 +378,19 @@ app.post('/api/captain/transaction', async (req, res) => {
       type, amount: amt, note: note || '', createdAt: new Date().toISOString(),
     });
     res.json({ success: true, wallet: newWallet });
+  } catch { res.status(500).json({ error: 'Failed' }); }
+});
+
+// ── Captain transaction history ───────────────────────────────
+app.get('/api/captain/transactions', async (req, res) => {
+  const { driverId, limit: lim } = req.query as any;
+  if (!driverId) return res.status(400).json({ error: 'Missing driverId' });
+  try {
+    const txSnap = await getDocs(collection(db, 'drivers', driverId, 'transactions'));
+    let txs = txSnap.docs.map(d => ({ id: d.id, ...d.data() }))
+      .sort((a: any, b: any) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+    if (lim) txs = txs.slice(0, Number(lim));
+    res.json({ transactions: txs });
   } catch { res.status(500).json({ error: 'Failed' }); }
 });
 
@@ -582,9 +604,13 @@ app.post('/api/action', async (req, res) => {
       return res.json({ success: true, message: 'تم إشعار العميل أن الكابتن في الطريق' });
 
     } else if (act === 'complete') {
+      // Fetch dynamic finance config
+      const finCfg = await getSetting<any>('finance_config', { captainSharePct: 0.70, packagePrices: PACKAGE_PRICES });
+      const dynPrices: Record<string, number> = { ...PACKAGE_PRICES, ...(finCfg.packagePrices || {}) };
+      const dynSharePct: number = finCfg.captainSharePct ?? CAPTAIN_SHARE_PCT;
       const pkgKey = (booking.package || '').toLowerCase();
-      const totalAmount = PACKAGE_PRICES[pkgKey] || PACKAGE_PRICES[booking.package] || 0;
-      const captainShare = Math.round(totalAmount * CAPTAIN_SHARE_PCT);
+      const totalAmount = dynPrices[pkgKey] || dynPrices[booking.package] || 0;
+      const captainShare = Math.round(totalAmount * dynSharePct);
       const companyShare = totalAmount - captainShare;
       await updateDoc(bookingRef, {
         status: 'completed', updatedAt: now, statusHistory: history,
@@ -670,7 +696,7 @@ app.post('/api/driver/accept-task', async (req, res) => {
   } catch (e) { res.status(500).json({ error: 'Failed' }); }
 });
 
-// Captain on the way
+// Captain on road — with ownership guard
 app.post('/api/driver/on-road', async (req, res) => {
   const { bookingId, driverId } = req.body;
   try {
@@ -678,8 +704,15 @@ app.post('/api/driver/on-road', async (req, res) => {
     const bsnap = await getDoc(bookingRef);
     if (!bsnap.exists()) return res.status(404).json({ error: 'Not found' });
     const booking = bsnap.data() as any;
+    if (driverId && booking.driverId && booking.driverId !== driverId) {
+      return res.status(403).json({ error: 'غير مخوّل لتعديل هذه المهمة' });
+    }
+    const currentStatus = booking.status || 'pending';
+    if (!ALLOWED_TRANSITIONS[currentStatus]?.includes('on_road')) {
+      return res.status(409).json({ error: `لا يمكن الانتقال من ${currentStatus} إلى on_road` });
+    }
     const now = new Date().toISOString();
-    const history = [...(booking.statusHistory || []), { status: 'on_road', at: now, by: 'driver' }];
+    const history = [...(booking.statusHistory || []), { status: 'on_road', at: now, by: 'captain' }];
     await updateDoc(bookingRef, { status: 'on_road', updatedAt: now, statusHistory: history });
     if (driverId) {
       const driverDoc = await getDoc(doc(db, 'drivers', driverId));
@@ -702,10 +735,22 @@ app.post('/api/driver/complete-task', async (req, res) => {
     const bsnap = await getDoc(bookingRef);
     if (!bsnap.exists()) return res.status(404).json({ error: 'Not found' });
     const booking = bsnap.data() as any;
+    // Guard: only assigned captain
+    if (driverId && booking.driverId && booking.driverId !== driverId) {
+      return res.status(403).json({ error: 'غير مخوّل لتعديل هذه المهمة' });
+    }
+    const currentStatus = booking.status || 'pending';
+    if (!ALLOWED_TRANSITIONS[currentStatus]?.includes('completed')) {
+      return res.status(409).json({ error: `لا يمكن الانتقال من ${currentStatus} إلى completed` });
+    }
     const now = new Date().toISOString();
+    // Fetch dynamic finance config
+    const finCfg = await getSetting<any>('finance_config', { captainSharePct: 0.70, packagePrices: PACKAGE_PRICES });
+    const dynPrices: Record<string, number> = { ...PACKAGE_PRICES, ...(finCfg.packagePrices || {}) };
+    const dynSharePct: number = finCfg.captainSharePct ?? CAPTAIN_SHARE_PCT;
     const pkgKey = (booking.package || '').toLowerCase();
-    const totalAmount = PACKAGE_PRICES[pkgKey] || PACKAGE_PRICES[booking.package] || 0;
-    const captainShare = Math.round(totalAmount * CAPTAIN_SHARE_PCT);
+    const totalAmount = dynPrices[pkgKey] || dynPrices[booking.package] || 0;
+    const captainShare = Math.round(totalAmount * dynSharePct);
     const companyShare = totalAmount - captainShare;
     const history = [...(booking.statusHistory || []), { status: 'completed', at: now, by: 'driver' }];
     await updateDoc(bookingRef, {
@@ -775,6 +820,58 @@ app.post('/api/admin/reset', async (_req, res) => {
     await setSetting('neighborhoods', DEFAULT_NEIGHBORHOODS);
     res.json({ success: true });
   } catch { res.status(500).json({ error: 'Reset failed' }); }
+});
+
+// ── Dynamic settings endpoints ───────────────────────────────
+// GET/POST /api/admin/settings/:key — generic key-value settings store
+app.get('/api/admin/settings/:key', async (req, res) => {
+  try {
+    const snap = await getDoc(doc(db, 'settings', req.params.key));
+    res.json(snap.exists() ? snap.data() : { value: null });
+  } catch { res.status(500).json({ error: 'Failed' }); }
+});
+
+app.post('/api/admin/settings/:key', async (req, res) => {
+  const { value } = req.body;
+  if (value === undefined) return res.status(400).json({ error: 'value required' });
+  try {
+    await setDoc(doc(db, 'settings', req.params.key), { value, updatedAt: new Date().toISOString() });
+    res.json({ success: true });
+  } catch { res.status(500).json({ error: 'Failed' }); }
+});
+
+// ── Manager financial overview ─────────────────────────────────
+app.get('/api/manager/finance/overview', async (_req, res) => {
+  try {
+    const [bookSnap, captainSnap] = await Promise.all([
+      getDocs(collection(db, 'bookings')),
+      getDocs(collection(db, 'drivers')),
+    ]);
+    const bookings = bookSnap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
+    const completed = bookings.filter(b => ['completed', 'closed'].includes(b.status) && b.financials);
+    const totalRevenue   = completed.reduce((s, b) => s + (b.financials?.totalAmount  || 0), 0);
+    const companyRevenue = completed.reduce((s, b) => s + (b.financials?.companyShare || 0), 0);
+    const captainPayouts = completed.reduce((s, b) => s + (b.financials?.captainShare || 0), 0);
+    const captains = captainSnap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
+    const captainSummary = captains.map(c => ({
+      id: c.id, name: c.name, phone: c.phone,
+      balance: c.wallet?.balance || 0,
+      totalEarned: c.wallet?.totalEarned || 0,
+      totalWithdrawn: c.wallet?.totalWithdrawn || 0,
+    }));
+    res.json({ totalRevenue, companyRevenue, captainPayouts, completedCount: completed.length, captains: captainSummary });
+  } catch { res.status(500).json({ error: 'Failed' }); }
+});
+
+app.get('/api/manager/finance/captains', async (_req, res) => {
+  try {
+    const snap = await getDocs(collection(db, 'drivers'));
+    const captains = snap.docs.map(d => {
+      const data = d.data() as any;
+      return { id: d.id, name: data.name, phone: data.phone, wallet: data.wallet || { balance: 0, totalEarned: 0, totalWithdrawn: 0 } };
+    });
+    res.json({ captains });
+  } catch { res.status(500).json({ error: 'Failed' }); }
 });
 
 // ── Automation rules CRUD ─────────────────────────────────────

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { LayoutGrid, Bell, Car, Users, MapPin, Settings, Play, Trash2, Plus, Check, RefreshCw, Moon, Sun, Send, TrendingUp, Pencil, X, ChevronDown, Terminal } from 'lucide-react';
+import { LayoutGrid, Bell, Car, Users, MapPin, Play, Trash2, Plus, Check, RefreshCw, Moon, Sun, Send, TrendingUp, Pencil, X, ChevronDown, Terminal, Wallet, DollarSign, ArrowDownLeft, ArrowUpRight, Save } from 'lucide-react';
 import MessageCard from '../components/MessageCard';
 
 function timeAgo(iso: string): string {
@@ -16,7 +16,8 @@ type Driver       = { id: string; name: string; code: string; phone?: string };
 type Manager      = { id: string; name: string; username: string };
 type EventKey     = 'new_booking' | 'booking_approved' | 'driver_accepted' | 'booking_rejected' | 'captain_on_road' | 'booking_completed';
 type RecipientType = 'manager' | 'captain' | 'customer' | 'custom';
-type Section      = 'dashboard' | 'workflow' | 'drivers' | 'managers' | 'locations' | 'settings';
+type Section      = 'dashboard' | 'workflow' | 'drivers' | 'managers' | 'locations' | 'finance' | 'settings';
+type FinanceCaptain = { id: string; name: string; phone?: string; balance: number; totalEarned: number; totalWithdrawn: number };
 
 interface TemplateConfig { enabled: boolean; template: string; }
 type Templates = Record<EventKey, TemplateConfig>;
@@ -68,12 +69,13 @@ const RECIPIENT_LABELS: Record<RecipientType, string> = {
 };
 
 const NAV: { key: Section; label: string; icon: React.ReactNode }[] = [
-  { key: 'dashboard', label: 'الرئيسية',          icon: <LayoutGrid size={20} strokeWidth={1.5} /> },
-  { key: 'workflow',  label: 'الرسائل',           icon: <Bell       size={20} strokeWidth={1.5} /> },
-  { key: 'drivers',   label: 'الكباتن',           icon: <Car        size={20} strokeWidth={1.5} /> },
-  { key: 'managers',  label: 'المدراء',           icon: <Users      size={20} strokeWidth={1.5} /> },
-  { key: 'locations', label: 'المناطق',           icon: <MapPin     size={20} strokeWidth={1.5} /> },
-  { key: 'settings',  label: 'اعدادات المطور',   icon: <Terminal   size={20} strokeWidth={1.5} /> },
+  { key: 'dashboard', label: 'الرئيسية',         icon: <LayoutGrid  size={20} strokeWidth={1.5} /> },
+  { key: 'workflow',  label: 'الرسائل',          icon: <Bell        size={20} strokeWidth={1.5} /> },
+  { key: 'drivers',   label: 'الكباتن',          icon: <Car         size={20} strokeWidth={1.5} /> },
+  { key: 'managers',  label: 'المدراء',          icon: <Users       size={20} strokeWidth={1.5} /> },
+  { key: 'locations', label: 'المناطق',          icon: <MapPin      size={20} strokeWidth={1.5} /> },
+  { key: 'finance',   label: 'المالية',          icon: <Wallet      size={20} strokeWidth={1.5} /> },
+  { key: 'settings',  label: 'اعدادات المطور',  icon: <Terminal    size={20} strokeWidth={1.5} /> },
 ];
 
 const inp = 'w-full px-3 py-2.5 border border-slate-200 dark:border-slate-600 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 bg-white dark:bg-slate-700 dark:text-white dark:placeholder-slate-400 transition';
@@ -227,13 +229,26 @@ export default function AdminDashboard() {
     localStorage.setItem('wt_dark', dark ? '1' : '0');
   }, [dark]);
 
-  const [drivers,       setDrivers]       = useState<Driver[]>([]);
-  const [managers,      setManagers]      = useState<Manager[]>([]);
-  const [bookings,      setBookings]      = useState<any[]>([]);
-  const [slots,         setSlots]         = useState<string[]>([]);
-  const [neighborhoods, setNeighborhoods] = useState<string[]>([]);
-  const [automations,   setAutomations]   = useState<AutomationRule[]>([]);
-  const [templates,     setTemplates]     = useState<Templates>(DEFAULT_TEMPLATES);
+  const [drivers,        setDrivers]        = useState<Driver[]>([]);
+  const [managers,       setManagers]       = useState<Manager[]>([]);
+  const [bookings,       setBookings]       = useState<any[]>([]);
+  const [slots,          setSlots]          = useState<string[]>([]);
+  const [neighborhoods,  setNeighborhoods]  = useState<string[]>([]);
+  const [automations,    setAutomations]    = useState<AutomationRule[]>([]);
+  const [templates,      setTemplates]      = useState<Templates>(DEFAULT_TEMPLATES);
+
+  // Finance state
+  const [finCaptains,    setFinCaptains]    = useState<FinanceCaptain[]>([]);
+  const [finOverview,    setFinOverview]    = useState<{ totalRevenue: number; companyRevenue: number; captainPayouts: number; completedCount: number } | null>(null);
+  const [adjForm,        setAdjForm]        = useState<{ captainId: string; type: 'adjustment'|'withdrawal'; amount: string; note: string }>({ captainId: '', type: 'adjustment', amount: '', note: '' });
+  const [adjMsg,         setAdjMsg]         = useState('');
+  const [adjLoading,     setAdjLoading]     = useState(false);
+
+  // Dynamic settings state
+  const [finConfig,      setFinConfig]      = useState({ captainSharePct: 70, basic: 15000, standard: 25000, premium: 35000 });
+  const [appConfig,      setAppConfig]      = useState({ appName: 'WashTech', tagline: 'خدمة غسيل سيارات احترافية', supportPhone: '' });
+  const [settingsSaved,  setSettingsSaved]  = useState('');
+  const [settingsLoading,setSettingsLoading]= useState(false);
 
   const [newDriver,   setNewDriver]   = useState({ name: '', code: '', phone: '' });
   const [newManager,  setNewManager]  = useState({ name: '', username: '', password: '' });
@@ -265,7 +280,7 @@ export default function AdminDashboard() {
   useEffect(() => { loadAll(); }, []);
 
   async function loadAll() {
-    const [d, b, s, n, m, t, a] = await Promise.all([
+    const [d, b, s, n, m, t, a, fc, ac] = await Promise.all([
       fetch('/api/drivers').then(r => r.json()),
       fetch('/api/bookings').then(r => r.json()),
       fetch('/api/slots').then(r => r.json()),
@@ -273,6 +288,8 @@ export default function AdminDashboard() {
       fetch('/api/admin/managers').then(r => r.json()),
       fetch('/api/admin/notification-templates').then(r => r.json()),
       fetch('/api/admin/automations').then(r => r.json()),
+      fetch('/api/admin/settings/finance_config').then(r => r.json()).catch(() => ({})),
+      fetch('/api/admin/settings/app_config').then(r => r.json()).catch(() => ({})),
     ]);
     setDrivers(d.drivers || []);
     setBookings(b.bookings || []);
@@ -281,6 +298,56 @@ export default function AdminDashboard() {
     setManagers(m.managers || []);
     if (t.templates) setTemplates({ ...DEFAULT_TEMPLATES, ...t.templates });
     if (a.automations) setAutomations(a.automations);
+    if (fc.value) {
+      const v = fc.value;
+      setFinConfig({ captainSharePct: Math.round((v.captainSharePct || 0.70) * 100), basic: v.packagePrices?.basic || 15000, standard: v.packagePrices?.standard || 25000, premium: v.packagePrices?.premium || 35000 });
+    }
+    if (ac.value) setAppConfig(prev => ({ ...prev, ...ac.value }));
+  }
+
+  async function loadFinance() {
+    try {
+      const [ov, ca] = await Promise.all([
+        fetch('/api/manager/finance/overview').then(r => r.json()),
+        fetch('/api/manager/finance/captains').then(r => r.json()),
+      ]);
+      setFinOverview(ov);
+      setFinCaptains(ca.captains || []);
+      if (ca.captains?.length) setAdjForm(p => ({ ...p, captainId: ca.captains[0].id }));
+    } catch {}
+  }
+
+  useEffect(() => { if (section === 'finance') loadFinance(); }, [section]);
+
+  async function submitAdjustment(e: React.FormEvent) {
+    e.preventDefault();
+    if (!adjForm.captainId || !adjForm.amount) return;
+    setAdjLoading(true); setAdjMsg('');
+    const res = await fetch('/api/captain/transaction', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ driverId: adjForm.captainId, type: adjForm.type, amount: Number(adjForm.amount), note: adjForm.note }),
+    });
+    const d = await res.json();
+    setAdjMsg(d.success ? '✓ تم تحديث المحفظة' : (d.error || 'خطأ'));
+    setAdjForm(p => ({ ...p, amount: '', note: '' }));
+    setAdjLoading(false);
+    loadFinance();
+    setTimeout(() => setAdjMsg(''), 3000);
+  }
+
+  async function saveFinanceConfig() {
+    setSettingsLoading(true);
+    const value = { captainSharePct: finConfig.captainSharePct / 100, packagePrices: { basic: finConfig.basic, standard: finConfig.standard, premium: finConfig.premium } };
+    await fetch('/api/admin/settings/finance_config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ value }) });
+    setSettingsSaved('finance'); setSettingsLoading(false);
+    setTimeout(() => setSettingsSaved(''), 2500);
+  }
+
+  async function saveAppConfig() {
+    setSettingsLoading(true);
+    await fetch('/api/admin/settings/app_config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ value: appConfig }) });
+    setSettingsSaved('app'); setSettingsLoading(false);
+    setTimeout(() => setSettingsSaved(''), 2500);
   }
 
   // Finance computed
@@ -757,6 +824,84 @@ export default function AdminDashboard() {
             </div>
           )}
 
+          {/* ── Finance ────────────────────────────────── */}
+          {section === 'finance' && (
+            <div className="space-y-5">
+              <div className="flex items-center justify-between">
+                <h2 className="font-bold text-slate-900 dark:text-white text-lg flex items-center gap-2"><Wallet size={20} className="text-green-600" /> المالية</h2>
+                <button onClick={loadFinance} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors text-slate-400"><RefreshCw size={16} /></button>
+              </div>
+
+              {/* Overview cards */}
+              {finOverview && (
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {[
+                    { label: 'إجمالي الإيرادات', val: finOverview.totalRevenue,   cls: 'text-slate-900 dark:text-white', icon: <DollarSign size={16} className="text-green-500" /> },
+                    { label: 'حصة الشركة',        val: finOverview.companyRevenue, cls: 'text-green-700 dark:text-green-400', icon: <ArrowUpRight size={16} className="text-green-500" /> },
+                    { label: 'حصة الكباتن',       val: finOverview.captainPayouts, cls: 'text-blue-700 dark:text-blue-400',  icon: <ArrowDownLeft size={16} className="text-blue-500" /> },
+                    { label: 'مكتملة',            val: finOverview.completedCount, cls: 'text-slate-700 dark:text-slate-300', icon: <Check size={16} className="text-slate-400" />, noFormat: true },
+                  ].map(s => (
+                    <div key={s.label} className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-4">
+                      <div className="flex items-center gap-1.5 mb-1">{s.icon}<p className="text-xs text-slate-500 dark:text-slate-400">{s.label}</p></div>
+                      <p className={`text-lg font-bold ${s.cls}`} dir="ltr">{(s as any).noFormat ? s.val : s.val.toLocaleString()}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Per-captain wallet table */}
+              <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+                <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-700">
+                  <h3 className="font-bold text-slate-900 dark:text-white text-sm">محافظ الكباتن</h3>
+                </div>
+                {finCaptains.length === 0 && <p className="text-center text-slate-400 text-sm py-8">لا يوجد كباتن بعد</p>}
+                {finCaptains.map(c => (
+                  <div key={c.id} className="flex items-center justify-between px-5 py-3 border-b border-slate-50 dark:border-slate-700 last:border-0 flex-wrap gap-2">
+                    <div>
+                      <p className="font-semibold text-slate-900 dark:text-white text-sm">{c.name}</p>
+                      {c.phone && <p className="text-xs text-slate-400 font-mono" dir="ltr">{c.phone}</p>}
+                    </div>
+                    <div className="flex gap-4 text-xs text-right">
+                      <div><p className="text-slate-400">الرصيد</p><p className="font-bold text-green-600" dir="ltr">{c.balance.toLocaleString()}</p></div>
+                      <div><p className="text-slate-400">مكتسب</p><p className="font-bold text-blue-600" dir="ltr">{c.totalEarned.toLocaleString()}</p></div>
+                      <div><p className="text-slate-400">مسحوب</p><p className="font-bold text-red-500" dir="ltr">{c.totalWithdrawn.toLocaleString()}</p></div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Manual wallet adjustment */}
+              <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-5">
+                <h3 className="font-bold text-slate-900 dark:text-white text-sm mb-4">تسوية مالية يدوية</h3>
+                <form onSubmit={submitAdjustment} className="space-y-3">
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <select value={adjForm.captainId} onChange={e => setAdjForm(p => ({ ...p, captainId: e.target.value }))} className={inp + ' appearance-none'}>
+                        {finCaptains.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                      </select>
+                      <ChevronDown size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                    </div>
+                    <div className="relative">
+                      <select value={adjForm.type} onChange={e => setAdjForm(p => ({ ...p, type: e.target.value as any }))} className={inp + ' appearance-none pr-8 w-auto'}>
+                        <option value="adjustment">إضافة رصيد</option>
+                        <option value="withdrawal">سحب رصيد</option>
+                      </select>
+                      <ChevronDown size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <input type="number" placeholder="المبلغ (د.ع)" required min="1" value={adjForm.amount} onChange={e => setAdjForm(p => ({ ...p, amount: e.target.value }))} className={inp + ' flex-1'} dir="ltr" />
+                    <input placeholder="ملاحظة (اختياري)" value={adjForm.note} onChange={e => setAdjForm(p => ({ ...p, note: e.target.value }))} className={inp + ' flex-1'} />
+                  </div>
+                  <button type="submit" disabled={adjLoading} className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold rounded-xl text-sm transition-colors">
+                    {adjLoading ? 'جاري...' : 'تطبيق التسوية'}
+                  </button>
+                  {adjMsg && <p className={`text-sm text-center font-medium ${adjMsg.startsWith('✓') ? 'text-green-600' : 'text-red-500'}`}>{adjMsg}</p>}
+                </form>
+              </div>
+            </div>
+          )}
+
           {/* ── Settings ───────────────────────────────── */}
           {section === 'settings' && (
             <div className="space-y-5">
@@ -848,6 +993,57 @@ export default function AdminDashboard() {
                     />
                   </div>
                 )}
+              </div>
+
+              {/* Finance config */}
+              <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-5">
+                <div className="flex items-center gap-2 mb-4">
+                  <DollarSign size={16} className="text-green-600" />
+                  <h3 className="font-bold text-slate-900 dark:text-white text-sm">إعدادات الماليات</h3>
+                </div>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5">نسبة الكابتن (%)</label>
+                    <input type="number" min="0" max="100" value={finConfig.captainSharePct} onChange={e => setFinConfig(p => ({ ...p, captainSharePct: Number(e.target.value) }))} className={inp} dir="ltr" />
+                    <p className="text-xs text-slate-400 mt-1">نسبة الشركة: {100 - finConfig.captainSharePct}%</p>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    {(['basic','standard','premium'] as const).map(pkg => (
+                      <div key={pkg}>
+                        <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5">{pkg === 'basic' ? 'أساسي' : pkg === 'standard' ? 'قياسي' : 'ممتاز'} (د.ع)</label>
+                        <input type="number" min="0" value={finConfig[pkg]} onChange={e => setFinConfig(p => ({ ...p, [pkg]: Number(e.target.value) }))} className={inp} dir="ltr" />
+                      </div>
+                    ))}
+                  </div>
+                  <button onClick={saveFinanceConfig} disabled={settingsLoading} className={`w-full py-2.5 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${settingsSaved === 'finance' ? 'bg-green-500 text-white' : 'bg-blue-600 hover:bg-blue-700 text-white'} disabled:opacity-50`}>
+                    <Save size={14} />{settingsSaved === 'finance' ? '✓ تم الحفظ' : 'حفظ إعدادات الماليات'}
+                  </button>
+                </div>
+              </div>
+
+              {/* App config */}
+              <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-5">
+                <div className="flex items-center gap-2 mb-4">
+                  <Terminal size={16} className="text-slate-500" />
+                  <h3 className="font-bold text-slate-900 dark:text-white text-sm">إعدادات التطبيق</h3>
+                </div>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5">اسم التطبيق</label>
+                    <input value={appConfig.appName} onChange={e => setAppConfig(p => ({ ...p, appName: e.target.value }))} className={inp} placeholder="WashTech" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5">الوصف / الشعار</label>
+                    <input value={appConfig.tagline} onChange={e => setAppConfig(p => ({ ...p, tagline: e.target.value }))} className={inp} placeholder="خدمة غسيل سيارات..." />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5">رقم الدعم (واتساب)</label>
+                    <input value={appConfig.supportPhone} onChange={e => setAppConfig(p => ({ ...p, supportPhone: e.target.value }))} className={inp} placeholder="+9647XXXXXXXXX" dir="ltr" />
+                  </div>
+                  <button onClick={saveAppConfig} disabled={settingsLoading} className={`w-full py-2.5 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${settingsSaved === 'app' ? 'bg-green-500 text-white' : 'bg-blue-600 hover:bg-blue-700 text-white'} disabled:opacity-50`}>
+                    <Save size={14} />{settingsSaved === 'app' ? '✓ تم الحفظ' : 'حفظ إعدادات التطبيق'}
+                  </button>
+                </div>
               </div>
 
               {/* System info */}

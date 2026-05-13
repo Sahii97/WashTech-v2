@@ -7,7 +7,8 @@ type Task = {
   financials?: { totalAmount: number; captainShare: number; companyShare: number };
 };
 type Captain = { id: string; name: string; code: string; phone?: string };
-type Wallet = { balance: number; totalEarned: number; totalWithdrawn: number };
+type Wallet  = { balance: number; totalEarned: number; totalWithdrawn: number };
+type Tx      = { id: string; type: string; amount: number; note?: string; bookingId?: string; createdAt: string };
 
 export default function CaptainView() {
   const [allCaptains, setAllCaptains] = useState<Captain[]>([]);
@@ -15,10 +16,13 @@ export default function CaptainView() {
   const [tasks,       setTasks]       = useState<Task[]>([]);
   const [recentDone,  setRecentDone]  = useState<Task[]>([]);
   const [wallet,      setWallet]      = useState<Wallet | null>(null);
+  const [transactions,setTransactions]= useState<Tx[]>([]);
+  const [txLoading,   setTxLoading]   = useState(false);
   const [loading,     setLoading]     = useState(false);
   const [captainsLoading, setCaptainsLoading] = useState(true);
   const [confirmId,   setConfirmId]   = useState<string | null>(null);
-  const [tab,         setTab]         = useState<'active' | 'done'>('active');
+  const [tab,         setTab]         = useState<'active' | 'done' | 'wallet'>('active');
+  const [actionError, setActionError] = useState<string | null>(null);
 
   useEffect(() => {
     fetch('/api/drivers')
@@ -58,28 +62,48 @@ export default function CaptainView() {
     } catch {}
   }
 
+  async function loadTransactions(captainId: string) {
+    setTxLoading(true);
+    try {
+      const res = await fetch(`/api/captain/transactions?driverId=${captainId}&limit=30`);
+      const data = await res.json();
+      setTransactions(data.transactions || []);
+    } catch {}
+    setTxLoading(false);
+  }
+
+  useEffect(() => {
+    if (captain && tab === 'wallet') loadTransactions(captain.id);
+  }, [tab, captain]);
+
   async function acceptTask(taskId: string) {
-    await fetch('/api/driver/accept-task', {
+    setActionError(null);
+    const res = await fetch('/api/driver/accept-task', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ bookingId: taskId, driverId: captain?.id }),
     });
+    if (!res.ok) { const d = await res.json(); setActionError(d.error || 'خطأ'); return; }
     if (captain) { loadTasks(captain.id); loadWallet(captain.id); }
   }
 
   async function onRoad(taskId: string) {
-    await fetch('/api/driver/on-road', {
+    setActionError(null);
+    const res = await fetch('/api/driver/on-road', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ bookingId: taskId, driverId: captain?.id }),
     });
+    if (!res.ok) { const d = await res.json(); setActionError(d.error || 'خطأ'); return; }
     if (captain) loadTasks(captain.id);
   }
 
   async function completeTask(taskId: string) {
     setConfirmId(null);
-    await fetch('/api/driver/complete-task', {
+    setActionError(null);
+    const res = await fetch('/api/driver/complete-task', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ bookingId: taskId, driverId: captain?.id }),
     });
+    if (!res.ok) { const d = await res.json(); setActionError(d.error || 'خطأ'); return; }
     if (captain) { loadTasks(captain.id); loadWallet(captain.id); }
   }
 
@@ -162,9 +186,9 @@ export default function CaptainView() {
         </div>
       </header>
 
-      {/* Tabs: active / done */}
+      {/* Tabs: active / done / wallet */}
       <div className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 flex px-4 gap-1">
-        {([['active','المهام النشطة'],['done','المكتملة']] as const).map(([k, l]) => (
+        {([['active','المهام النشطة'],['done','المكتملة'],['wallet','المحفظة']] as const).map(([k, l]) => (
           <button
             key={k}
             onClick={() => setTab(k)}
@@ -173,12 +197,20 @@ export default function CaptainView() {
             }`}
           >
             {k === 'done' && <IcHistory className="w-4 h-4" />}
+            {k === 'wallet' && <IcWallet className="w-4 h-4" />}
             {l}
           </button>
         ))}
       </div>
 
       <div className="flex-1 max-w-lg mx-auto w-full p-4 space-y-3 pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
+        {/* Action error banner */}
+        {actionError && (
+          <div className="bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 rounded-xl px-4 py-3 flex items-center justify-between">
+            <span className="text-red-700 dark:text-red-400 text-sm">{actionError}</span>
+            <button onClick={() => setActionError(null)} className="text-red-400 hover:text-red-600 mr-2"><IcCheck className="w-4 h-4" /></button>
+          </div>
+        )}
         {loading && (
           <div className="text-center py-12">
             <div className="w-7 h-7 border-2 border-brand-600 border-t-transparent rounded-full animate-spin mx-auto" />
@@ -263,6 +295,53 @@ export default function CaptainView() {
             )}
           </div>
         ))}
+        {/* Wallet tab */}
+        {tab === 'wallet' && wallet && (
+          <div className="space-y-3">
+            {/* Summary cards */}
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { label: 'الرصيد الحالي', val: wallet.balance, cls: 'text-green-600' },
+                { label: 'إجمالي المكتسب', val: wallet.totalEarned, cls: 'text-blue-600' },
+                { label: 'إجمالي المسحوب', val: wallet.totalWithdrawn, cls: 'text-red-500' },
+              ].map(s => (
+                <div key={s.label} className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-4 text-center">
+                  <p className={`text-lg font-bold ${s.cls}`} dir="ltr">{s.val.toLocaleString()}</p>
+                  <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">{s.label}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Transaction history */}
+            <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+              <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-700">
+                <p className="font-bold text-slate-900 dark:text-white text-sm">سجل المعاملات</p>
+              </div>
+              {txLoading && <div className="text-center py-8"><div className="w-6 h-6 border-2 border-brand-600 border-t-transparent rounded-full animate-spin mx-auto" /></div>}
+              {!txLoading && transactions.length === 0 && <p className="text-slate-400 text-sm text-center py-8">لا توجد معاملات بعد</p>}
+              {!txLoading && transactions.map(tx => (
+                <div key={tx.id} className="flex items-center justify-between px-4 py-3 border-b border-slate-50 dark:border-slate-700 last:border-0">
+                  <div>
+                    <p className="text-sm font-medium text-slate-900 dark:text-white">
+                      {tx.type === 'earning' ? 'أرباح' : tx.type === 'withdrawal' ? 'سحب' : 'تسوية'}
+                      {tx.note ? ` — ${tx.note}` : ''}
+                    </p>
+                    <p className="text-xs text-slate-400 font-mono">{new Date(tx.createdAt).toLocaleDateString('ar-IQ')}</p>
+                  </div>
+                  <p className={`text-sm font-bold ${tx.type === 'withdrawal' ? 'text-red-500' : 'text-green-600'}`} dir="ltr">
+                    {tx.type === 'withdrawal' ? '-' : '+'}{tx.amount.toLocaleString()} IQD
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        {tab === 'wallet' && !wallet && !loading && (
+          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-10 text-center text-slate-400">
+            <IcWallet className="w-10 h-10 mx-auto mb-3 text-slate-300" />
+            <p>لم يتم تحميل بيانات المحفظة</p>
+          </div>
+        )}
       </div>
 
       {/* Confirm overlay */}
