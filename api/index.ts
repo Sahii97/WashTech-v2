@@ -1072,4 +1072,9 @@ app.post('/api/admin/simulate-cycle', async (req, res) => {
   }
 });
 
+// Named export for the dev server (server.ts imports this)
+export { app };
+
+// Default export: Vercel serverless handler
+// Vercel calls this function directly with (req, res)
 export default app;

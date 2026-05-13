@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import { createServer as createViteServer } from 'vite';
-import app from './api/index';
+import { app } from './api/index';
 
 const PORT = process.env.PORT || 3000;
 
