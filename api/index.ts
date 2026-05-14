@@ -623,10 +623,17 @@ app.post('/api/action', async (req, res) => {
     } else if (act === 'complete') {
       // Fetch dynamic finance config
       const finCfg = await getSetting<any>('finance_config', { captainSharePct: 0.70, packagePrices: PACKAGE_PRICES });
-      const dynPrices: Record<string, number> = { ...PACKAGE_PRICES, ...(finCfg.packagePrices || {}) };
       const dynSharePct: number = finCfg.captainSharePct ?? CAPTAIN_SHARE_PCT;
-      const pkgKey = (booking.package || '').toLowerCase();
-      const totalAmount = dynPrices[pkgKey] || dynPrices[booking.package] || 0;
+      
+      let totalAmount = 0;
+      if (req.body.actualAmount !== undefined && req.body.actualAmount !== null) {
+        totalAmount = Number(req.body.actualAmount);
+      } else {
+        const dynPrices: Record<string, number> = { ...PACKAGE_PRICES, ...(finCfg.packagePrices || {}) };
+        const pkgKey = (booking.package || '').toLowerCase();
+        totalAmount = dynPrices[pkgKey] || dynPrices[booking.package] || 0;
+      }
+      
       const captainShare = Math.round(totalAmount * dynSharePct);
       const companyShare = totalAmount - captainShare;
       await updateDoc(bookingRef, {
@@ -746,7 +753,7 @@ app.post('/api/driver/on-road', async (req, res) => {
 
 // Captain complete task
 app.post('/api/driver/complete-task', async (req, res) => {
-  const { bookingId, driverId } = req.body;
+  const { bookingId, driverId, actualAmount } = req.body;
   try {
     const bookingRef = doc(db, 'bookings', bookingId);
     const bsnap = await getDoc(bookingRef);
@@ -763,10 +770,17 @@ app.post('/api/driver/complete-task', async (req, res) => {
     const now = new Date().toISOString();
     // Fetch dynamic finance config
     const finCfg = await getSetting<any>('finance_config', { captainSharePct: 0.70, packagePrices: PACKAGE_PRICES });
-    const dynPrices: Record<string, number> = { ...PACKAGE_PRICES, ...(finCfg.packagePrices || {}) };
     const dynSharePct: number = finCfg.captainSharePct ?? CAPTAIN_SHARE_PCT;
-    const pkgKey = (booking.package || '').toLowerCase();
-    const totalAmount = dynPrices[pkgKey] || dynPrices[booking.package] || 0;
+    
+    let totalAmount = 0;
+    if (actualAmount !== undefined && actualAmount !== null) {
+      totalAmount = Number(actualAmount);
+    } else {
+      const dynPrices: Record<string, number> = { ...PACKAGE_PRICES, ...(finCfg.packagePrices || {}) };
+      const pkgKey = (booking.package || '').toLowerCase();
+      totalAmount = dynPrices[pkgKey] || dynPrices[booking.package] || 0;
+    }
+    
     const captainShare = Math.round(totalAmount * dynSharePct);
     const companyShare = totalAmount - captainShare;
     const history = [...(booking.statusHistory || []), { status: 'completed', at: now, by: 'driver' }];
@@ -825,8 +839,13 @@ app.post('/api/admin/reset', async (_req, res) => {
     await Promise.all(bookSnap.docs.map(d => deleteDoc(doc(db, 'bookings', d.id))));
     const linkSnap = await getDocs(collection(db, 'links'));
     await Promise.all(linkSnap.docs.map(d => deleteDoc(doc(db, 'links', d.id))));
+    
     const driverSnap = await getDocs(collection(db, 'drivers'));
-    await Promise.all(driverSnap.docs.map(d => deleteDoc(doc(db, 'drivers', d.id))));
+    await Promise.all(driverSnap.docs.map(async (d) => {
+      const txSnap = await getDocs(collection(db, 'drivers', d.id, 'transactions'));
+      await Promise.all(txSnap.docs.map(tx => deleteDoc(doc(db, 'drivers', d.id, 'transactions', tx.id))));
+      await deleteDoc(doc(db, 'drivers', d.id));
+    }));
     for (const d of DEFAULT_CAPTAINS) {
       await setDoc(doc(db, 'drivers', d.id), {
         name: d.name, code: d.code, phone: d.phone,

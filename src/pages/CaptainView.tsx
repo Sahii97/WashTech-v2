@@ -23,6 +23,7 @@ export default function CaptainView() {
   const [confirmId,   setConfirmId]   = useState<string | null>(null);
   const [tab,         setTab]         = useState<'active' | 'done' | 'wallet'>('active');
   const [actionError, setActionError] = useState<string | null>(null);
+  const [actualAmount, setActualAmount] = useState<string>('');
 
   useEffect(() => {
     fetch('/api/drivers')
@@ -97,14 +98,20 @@ export default function CaptainView() {
   }
 
   async function completeTask(taskId: string) {
+    if (!actualAmount) {
+      setActionError('يرجى إدخال المبلغ المستلم');
+      setConfirmId(null);
+      return;
+    }
     setConfirmId(null);
     setActionError(null);
     const res = await fetch('/api/driver/complete-task', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ bookingId: taskId, driverId: captain?.id }),
+      body: JSON.stringify({ bookingId: taskId, driverId: captain?.id, actualAmount: Number(actualAmount) }),
     });
     if (!res.ok) { const d = await res.json(); setActionError(d.error || 'خطأ'); return; }
     if (captain) { loadTasks(captain.id); loadWallet(captain.id); }
+    setActualAmount('');
   }
 
   // ── Captain picker ───────────────────────────────────────────
@@ -250,26 +257,10 @@ export default function CaptainView() {
               </button>
             )}
             {task.status === 'on_road' && (
-              confirmId === task.id ? (
-                <div className="space-y-2">
-                  <p className="text-sm text-center text-slate-600 dark:text-slate-300 font-medium">تأكيد إتمام الخدمة؟</p>
-                  <div className="flex gap-2">
-                    <button onClick={() => completeTask(task.id)}
-                      className="flex-1 py-2.5 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-xl transition-colors text-sm flex items-center justify-center gap-2">
-                      <IcCheck className="w-4 h-4" /> نعم، تم الانتهاء
-                    </button>
-                    <button onClick={() => setConfirmId(null)}
-                      className="px-4 py-2.5 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold rounded-xl text-sm">
-                      إلغاء
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <button onClick={() => setConfirmId(task.id)}
-                  className="w-full py-2.5 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-xl transition-colors text-sm flex items-center justify-center gap-2">
-                  <IcCheck className="w-4 h-4" /> تم الانتهاء
-                </button>
-              )
+              <button onClick={() => { setConfirmId(task.id); setActualAmount(''); }}
+                className="w-full py-2.5 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-xl transition-colors text-sm flex items-center justify-center gap-2">
+                <IcCheck className="w-4 h-4" /> تم الانتهاء
+              </button>
             )}
           </div>
         ))}
@@ -350,11 +341,12 @@ export default function CaptainView() {
           onClick={() => setConfirmId(null)}>
           <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 w-full max-w-sm" onClick={e => e.stopPropagation()}>
             <h2 className="font-bold text-slate-900 dark:text-white text-lg mb-2">تأكيد إتمام الخدمة</h2>
-            <p className="text-slate-500 dark:text-slate-400 text-sm mb-5">هل تأكد من انتهاء خدمة الغسيل بالكامل؟ لا يمكن التراجع.</p>
+            <p className="text-slate-500 dark:text-slate-400 text-sm mb-4">أدخل المبلغ الإجمالي الذي استلمته من العميل:</p>
+            <input type="number" dir="ltr" placeholder="المبلغ (د.ع)" value={actualAmount} onChange={e => setActualAmount(e.target.value)} className="w-full px-4 py-3 mb-5 border border-slate-300 dark:border-slate-600 rounded-xl text-center text-lg font-bold bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white" />
             <div className="flex gap-3">
-              <button onClick={() => completeTask(confirmId)}
-                className="flex-1 py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl transition-colors">
-                نعم، اكتملت
+              <button onClick={() => completeTask(confirmId)} disabled={!actualAmount}
+                className="flex-1 py-3 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white font-bold rounded-xl transition-colors">
+                تأكيد الإتمام
               </button>
               <button onClick={() => setConfirmId(null)}
                 className="flex-1 py-3 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 font-semibold rounded-xl">
