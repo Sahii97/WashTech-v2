@@ -240,9 +240,14 @@ async function creditCaptainWallet(driverId: string, amount: number, bookingId: 
   await updateDoc(driverRef, {
     wallet: { balance: (w.balance || 0) + amount, totalEarned: (w.totalEarned || 0) + amount, totalWithdrawn: w.totalWithdrawn || 0 },
   });
-  await addDoc(collection(db, 'drivers', driverId, 'transactions'), {
-    type: 'earning', amount, bookingId, note, createdAt: new Date().toISOString(),
-  });
+  try {
+    await addDoc(collection(db, 'drivers', driverId, 'transactions'), {
+      type: 'earning', amount, bookingId, note, createdAt: new Date().toISOString(),
+    });
+  } catch (e) {
+    console.error('[creditCaptainWallet] Failed to add transaction:', e);
+    throw e;
+  }
 }
 
 // ── Express app ───────────────────────────────────────────────
@@ -795,7 +800,10 @@ app.post('/api/driver/complete-task', async (req, res) => {
     }, booking.phone || '');
     await sendWhatsApp(MANAGER_PHONE, `✅ اكتمل حجز #${bookingId.slice(-6)} — 💰 ${totalAmount.toLocaleString('ar-IQ')} د.ع`);
     res.json({ success: true });
-  } catch (e) { res.status(500).json({ error: 'Failed' }); }
+  } catch (e) {
+    console.error('[complete-task]', e);
+    res.status(500).json({ error: e instanceof Error ? e.message : String(e) });
+  }
 });
 
 // Legacy update-status — NOW with state machine guard
