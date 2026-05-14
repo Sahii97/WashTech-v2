@@ -860,7 +860,10 @@ app.post('/api/admin/reset', async (_req, res) => {
     await setSetting('slots', DEFAULT_SLOTS);
     await setSetting('neighborhoods', DEFAULT_NEIGHBORHOODS);
     res.json({ success: true });
-  } catch { res.status(500).json({ error: 'Reset failed' }); }
+  } catch (e) {
+    console.error('[reset]', e);
+    res.status(500).json({ error: e instanceof Error ? e.message : String(e) });
+  }
 });
 
 // ── Dynamic settings endpoints ───────────────────────────────

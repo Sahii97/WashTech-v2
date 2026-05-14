@@ -898,13 +898,25 @@ export default function AdminDashboard() {
                 <h3 className="font-bold text-slate-900 dark:text-white text-sm mb-4">تسوية مالية يدوية</h3>
                 <form onSubmit={submitAdjustment} className="space-y-3">
                   <div className="flex gap-2">
-                    <div className="relative flex-1">
-                      <select value={adjForm.captainId} onChange={e => setAdjForm(p => ({ ...p, captainId: e.target.value }))} className={inp + ' appearance-none'}>
-                        {finCaptains.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                      </select>
-                      <ChevronDown size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                    <div className="flex-1">
+                      <div className="relative">
+                        <select value={adjForm.captainId} onChange={e => setAdjForm(p => ({ ...p, captainId: e.target.value }))} className={inp + ' appearance-none'}>
+                          <option value="" disabled>اختر الكابتن...</option>
+                          {finCaptains.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                        </select>
+                        <ChevronDown size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                      </div>
+                      {(() => {
+                        const sel = finCaptains.find(c => c.id === adjForm.captainId);
+                        if (!sel) return null;
+                        return (
+                          <p className="text-xs mt-1.5 px-1 font-medium">
+                            {sel.balance < 0 ? <span className="text-red-500">المطلوب استلامه للتسوية: {Math.abs(sel.balance).toLocaleString()} د.ع</span> : <span className="text-green-600">رصيده الحالي: {sel.balance.toLocaleString()} د.ع</span>}
+                          </p>
+                        );
+                      })()}
                     </div>
-                    <div className="relative">
+                    <div className="relative h-fit">
                       <select value={adjForm.type} onChange={e => setAdjForm(p => ({ ...p, type: e.target.value as any }))} className={inp + ' appearance-none pr-8 w-auto'}>
                         <option value="receipt">استلام نقدي من الكابتن</option>
                         <option value="withdrawal">سحب رصيد (دفع للكابتن)</option>
