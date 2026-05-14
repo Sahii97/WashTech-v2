@@ -240,7 +240,7 @@ export default function AdminDashboard() {
   // Finance state
   const [finCaptains,    setFinCaptains]    = useState<FinanceCaptain[]>([]);
   const [finOverview,    setFinOverview]    = useState<{ totalRevenue: number; companyRevenue: number; captainPayouts: number; completedCount: number } | null>(null);
-  const [adjForm,        setAdjForm]        = useState<{ captainId: string; type: 'adjustment'|'withdrawal'; amount: string; note: string }>({ captainId: '', type: 'adjustment', amount: '', note: '' });
+  const [adjForm,        setAdjForm]        = useState<{ captainId: string; type: 'adjustment'|'withdrawal'|'receipt'; amount: string; note: string }>({ captainId: '', type: 'receipt', amount: '', note: '' });
   const [adjMsg,         setAdjMsg]         = useState('');
   const [adjLoading,     setAdjLoading]     = useState(false);
   const [finLoading,     setFinLoading]     = useState(false);
@@ -885,9 +885,9 @@ export default function AdminDashboard() {
                       {c.phone && <p className="text-xs text-slate-400 font-mono" dir="ltr">{c.phone}</p>}
                     </div>
                     <div className="flex gap-4 text-xs text-right">
-                      <div><p className="text-slate-400">الرصيد</p><p className="font-bold text-green-600" dir="ltr">{c.balance.toLocaleString()}</p></div>
+                      <div><p className="text-slate-400">مطلوب منه</p><p className={`font-bold ${c.balance < 0 ? 'text-red-500' : 'text-green-600'}`} dir="ltr">{Math.abs(c.balance).toLocaleString()}</p></div>
                       <div><p className="text-slate-400">مكتسب</p><p className="font-bold text-blue-600" dir="ltr">{c.totalEarned.toLocaleString()}</p></div>
-                      <div><p className="text-slate-400">مسحوب</p><p className="font-bold text-red-500" dir="ltr">{c.totalWithdrawn.toLocaleString()}</p></div>
+                      <div><p className="text-slate-400">مستلم كاش</p><p className="font-bold text-slate-600 dark:text-slate-300" dir="ltr">{(c.totalCollected || 0).toLocaleString()}</p></div>
                     </div>
                   </div>
                 ))}
@@ -906,8 +906,9 @@ export default function AdminDashboard() {
                     </div>
                     <div className="relative">
                       <select value={adjForm.type} onChange={e => setAdjForm(p => ({ ...p, type: e.target.value as any }))} className={inp + ' appearance-none pr-8 w-auto'}>
-                        <option value="adjustment">إضافة رصيد</option>
-                        <option value="withdrawal">سحب رصيد</option>
+                        <option value="receipt">استلام نقدي من الكابتن</option>
+                        <option value="withdrawal">سحب رصيد (دفع للكابتن)</option>
+                        <option value="adjustment">تسوية مالية (تصفير رصيد)</option>
                       </select>
                       <ChevronDown size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                     </div>

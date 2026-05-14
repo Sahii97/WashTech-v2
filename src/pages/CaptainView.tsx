@@ -292,9 +292,9 @@ export default function CaptainView() {
             {/* Summary cards */}
             <div className="grid grid-cols-3 gap-2">
               {[
-                { label: 'الرصيد الحالي', val: wallet.balance, cls: 'text-green-600' },
-                { label: 'إجمالي المكتسب', val: wallet.totalEarned, cls: 'text-blue-600' },
-                { label: 'إجمالي المسحوب', val: wallet.totalWithdrawn, cls: 'text-red-500' },
+                { label: 'إجمالي المبالغ المستلمة', val: wallet.totalCollected || 0, cls: 'text-green-600' },
+                { label: 'إجمالي المكتسب', val: wallet.totalEarned || 0, cls: 'text-blue-600' },
+                { label: 'المطلوب سداده للشركة', val: (wallet.balance || 0) < 0 ? Math.abs(wallet.balance) : 0, cls: 'text-red-500' },
               ].map(s => (
                 <div key={s.label} className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-4 text-center">
                   <p className={`text-lg font-bold ${s.cls}`} dir="ltr">{s.val.toLocaleString()}</p>
@@ -314,13 +314,13 @@ export default function CaptainView() {
                 <div key={tx.id} className="flex items-center justify-between px-4 py-3 border-b border-slate-50 dark:border-slate-700 last:border-0">
                   <div>
                     <p className="text-sm font-medium text-slate-900 dark:text-white">
-                      {tx.type === 'earning' ? 'أرباح' : tx.type === 'withdrawal' ? 'سحب' : 'تسوية'}
+                      {tx.type === 'earning' ? 'أرباح' : tx.type === 'withdrawal' ? 'سحب' : tx.type === 'receipt' ? 'تسديد للشركة' : 'تسوية'}
                       {tx.note ? ` — ${tx.note}` : ''}
                     </p>
                     <p className="text-xs text-slate-400 font-mono">{new Date(tx.createdAt).toLocaleDateString('ar-IQ')}</p>
                   </div>
-                  <p className={`text-sm font-bold ${tx.type === 'withdrawal' ? 'text-red-500' : 'text-green-600'}`} dir="ltr">
-                    {tx.type === 'withdrawal' ? '-' : '+'}{tx.amount.toLocaleString()} IQD
+                  <p className={`text-sm font-bold ${tx.type === 'withdrawal' ? 'text-red-500' : tx.type === 'receipt' ? 'text-blue-500' : 'text-green-600'}`} dir="ltr">
+                    {tx.type === 'withdrawal' || tx.type === 'receipt' ? '-' : '+'}{Math.abs(tx.amount).toLocaleString()} IQD
                   </p>
                 </div>
               ))}

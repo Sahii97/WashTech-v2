@@ -231,18 +231,18 @@ async function notify(event: EventKey, vars: Record<string, string>, fallbackTo:
 }
 
 // ── Captain wallet helpers ────────────────────────────────────
-async function creditCaptainWallet(driverId: string, amount: number, bookingId: string, note: string) {
-  if (!driverId || amount <= 0) return;
+async function creditCaptainWallet(driverId: string, totalAmount: number, captainShare: number, companyShare: number, bookingId: string, note: string) {
+  if (!driverId || totalAmount <= 0) return;
   const driverRef = doc(db, 'drivers', driverId);
   const snap = await getDoc(driverRef);
   if (!snap.exists()) return;
   const data = snap.data() as any;
-  const w = data.wallet || { balance: 0, totalEarned: 0, totalWithdrawn: 0 };
+  const w = data.wallet || { balance: 0, totalEarned: 0, totalWithdrawn: 0, totalCollected: 0 };
   const txs = data.transactions || [];
-  const newTx = { id: Date.now().toString(), type: 'earning', amount, bookingId, note, createdAt: new Date().toISOString() };
+  const newTx = { id: Date.now().toString(), type: 'earning', totalAmount, captainShare, companyShare, amount: -companyShare, bookingId, note, createdAt: new Date().toISOString() };
   try {
     await updateDoc(driverRef, {
-      wallet: { balance: (w.balance || 0) + amount, totalEarned: (w.totalEarned || 0) + amount, totalWithdrawn: w.totalWithdrawn || 0 },
+      wallet: { balance: (w.balance || 0) - companyShare, totalEarned: (w.totalEarned || 0) + captainShare, totalCollected: (w.totalCollected || 0) + totalAmount, totalWithdrawn: w.totalWithdrawn || 0, totalPaidToCompany: w.totalPaidToCompany || 0 },
       transactions: [...txs, newTx]
     });
   } catch (e) {
@@ -381,7 +381,7 @@ app.post('/api/captain/transaction', async (req, res) => {
     const snap = await getDoc(driverRef);
     if (!snap.exists()) return res.status(404).json({ error: 'Not found' });
     const data = snap.data() as any;
-    const w = data.wallet || { balance: 0, totalEarned: 0, totalWithdrawn: 0 };
+    const w = data.wallet || { balance: 0, totalEarned: 0, totalWithdrawn: 0, totalCollected: 0, totalPaidToCompany: 0 };
     const txs = data.transactions || [];
     const amt = Number(amount);
     const newWallet = { ...w };
@@ -391,6 +391,9 @@ app.post('/api/captain/transaction', async (req, res) => {
       newWallet.totalWithdrawn = (w.totalWithdrawn || 0) + amt;
     } else if (type === 'adjustment') {
       newWallet.balance = (w.balance || 0) + amt;
+    } else if (type === 'receipt') {
+      newWallet.balance = (w.balance || 0) + amt;
+      newWallet.totalPaidToCompany = (w.totalPaidToCompany || 0) + amt;
     }
     const newTx = { id: Date.now().toString(), type, amount: amt, note: note || '', createdAt: new Date().toISOString() };
     await updateDoc(driverRef, { wallet: newWallet, transactions: [...txs, newTx] });
@@ -789,7 +792,7 @@ app.post('/api/driver/complete-task', async (req, res) => {
       status: 'completed', updatedAt: now, statusHistory: history,
       financials: { totalAmount, captainShare, companyShare },
     });
-    if (driverId) await creditCaptainWallet(driverId, captainShare, bookingId, `حجز #${bookingId.slice(-6)}`);
+    if (driverId) await creditCaptainWallet(driverId, totalAmount, captainShare, companyShare, bookingId, `حجز #${bookingId.slice(-6)}`);
     await notify('booking_completed', {
       name: booking.name || '', phone: booking.phone || '',
       amount: totalAmount.toLocaleString('ar-IQ'),
