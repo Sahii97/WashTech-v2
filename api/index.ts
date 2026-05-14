@@ -236,16 +236,17 @@ async function creditCaptainWallet(driverId: string, amount: number, bookingId: 
   const driverRef = doc(db, 'drivers', driverId);
   const snap = await getDoc(driverRef);
   if (!snap.exists()) return;
-  const w = (snap.data() as any).wallet || { balance: 0, totalEarned: 0, totalWithdrawn: 0 };
-  await updateDoc(driverRef, {
-    wallet: { balance: (w.balance || 0) + amount, totalEarned: (w.totalEarned || 0) + amount, totalWithdrawn: w.totalWithdrawn || 0 },
-  });
+  const data = snap.data() as any;
+  const w = data.wallet || { balance: 0, totalEarned: 0, totalWithdrawn: 0 };
+  const txs = data.transactions || [];
+  const newTx = { id: Date.now().toString(), type: 'earning', amount, bookingId, note, createdAt: new Date().toISOString() };
   try {
-    await addDoc(collection(db, 'drivers', driverId, 'transactions'), {
-      type: 'earning', amount, bookingId, note, createdAt: new Date().toISOString(),
+    await updateDoc(driverRef, {
+      wallet: { balance: (w.balance || 0) + amount, totalEarned: (w.totalEarned || 0) + amount, totalWithdrawn: w.totalWithdrawn || 0 },
+      transactions: [...txs, newTx]
     });
   } catch (e) {
-    console.error('[creditCaptainWallet] Failed to add transaction:', e);
+    console.error('[creditCaptainWallet] Failed to update wallet/transactions:', e);
     throw e;
   }
 }
@@ -361,15 +362,9 @@ app.get('/api/captain/wallet', async (req, res) => {
       // Return empty wallet instead of 404 — captain may be new
       return res.json({ wallet: { balance: 0, totalEarned: 0, totalWithdrawn: 0 }, transactions: [] });
     }
-    const wallet = (snap.data() as any).wallet || { balance: 0, totalEarned: 0, totalWithdrawn: 0 };
-    // Transactions are in a subcollection — fetch separately with graceful fallback
-    let transactions: any[] = [];
-    try {
-      const txSnap = await getDocs(collection(db, 'drivers', driverId as string, 'transactions'));
-      transactions = txSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-    } catch (txErr) {
-      console.warn('[wallet] transactions fetch failed (non-fatal):', txErr);
-    }
+    const data = snap.data() as any;
+    const wallet = data.wallet || { balance: 0, totalEarned: 0, totalWithdrawn: 0 };
+    const transactions = data.transactions || [];
     res.json({ wallet, transactions });
   } catch (e) {
     console.error('[wallet]', e);
@@ -385,7 +380,9 @@ app.post('/api/captain/transaction', async (req, res) => {
     const driverRef = doc(db, 'drivers', driverId);
     const snap = await getDoc(driverRef);
     if (!snap.exists()) return res.status(404).json({ error: 'Not found' });
-    const w = (snap.data() as any).wallet || { balance: 0, totalEarned: 0, totalWithdrawn: 0 };
+    const data = snap.data() as any;
+    const w = data.wallet || { balance: 0, totalEarned: 0, totalWithdrawn: 0 };
+    const txs = data.transactions || [];
     const amt = Number(amount);
     const newWallet = { ...w };
     if (type === 'withdrawal') {
@@ -395,10 +392,8 @@ app.post('/api/captain/transaction', async (req, res) => {
     } else if (type === 'adjustment') {
       newWallet.balance = (w.balance || 0) + amt;
     }
-    await updateDoc(driverRef, { wallet: newWallet });
-    await addDoc(collection(db, 'drivers', driverId, 'transactions'), {
-      type, amount: amt, note: note || '', createdAt: new Date().toISOString(),
-    });
+    const newTx = { id: Date.now().toString(), type, amount: amt, note: note || '', createdAt: new Date().toISOString() };
+    await updateDoc(driverRef, { wallet: newWallet, transactions: [...txs, newTx] });
     res.json({ success: true, wallet: newWallet });
   } catch { res.status(500).json({ error: 'Failed' }); }
 });
@@ -408,9 +403,10 @@ app.get('/api/captain/transactions', async (req, res) => {
   const { driverId, limit: lim } = req.query as any;
   if (!driverId) return res.status(400).json({ error: 'Missing driverId' });
   try {
-    const txSnap = await getDocs(collection(db, 'drivers', driverId, 'transactions'));
-    let txs = txSnap.docs.map(d => ({ id: d.id, ...d.data() }))
-      .sort((a: any, b: any) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+    const snap = await getDoc(doc(db, 'drivers', driverId));
+    if (!snap.exists()) return res.json({ transactions: [] });
+    let txs = (snap.data() as any).transactions || [];
+    txs = txs.sort((a: any, b: any) => (b.createdAt || '').localeCompare(a.createdAt || ''));
     if (lim) txs = txs.slice(0, Number(lim));
     res.json({ transactions: txs });
   } catch { res.status(500).json({ error: 'Failed' }); }
@@ -849,15 +845,13 @@ app.post('/api/admin/reset', async (_req, res) => {
     await Promise.all(linkSnap.docs.map(d => deleteDoc(doc(db, 'links', d.id))));
     
     const driverSnap = await getDocs(collection(db, 'drivers'));
-    await Promise.all(driverSnap.docs.map(async (d) => {
-      const txSnap = await getDocs(collection(db, 'drivers', d.id, 'transactions'));
-      await Promise.all(txSnap.docs.map(tx => deleteDoc(doc(db, 'drivers', d.id, 'transactions', tx.id))));
-      await deleteDoc(doc(db, 'drivers', d.id));
-    }));
+    await Promise.all(driverSnap.docs.map(d => deleteDoc(doc(db, 'drivers', d.id))));
+    
     for (const d of DEFAULT_CAPTAINS) {
       await setDoc(doc(db, 'drivers', d.id), {
         name: d.name, code: d.code, phone: d.phone,
         wallet: { balance: 0, totalEarned: 0, totalWithdrawn: 0 },
+        transactions: []
       });
     }
     await setSetting('slots', DEFAULT_SLOTS);
