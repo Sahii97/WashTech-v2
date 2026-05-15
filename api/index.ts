@@ -312,8 +312,8 @@ app.get('/api/slots', async (_req, res) => {
 app.post('/api/slots', async (req, res) => {
   const { slots } = req.body;
   if (!Array.isArray(slots)) return res.status(400).json({ error: 'slots must be array' });
-  await setSetting('slots', slots);
-  res.json({ success: true });
+  try { await setSetting('slots', slots); res.json({ success: true }); }
+  catch (e: any) { res.status(500).json({ error: e.message }); }
 });
 
 // ── Neighborhoods ─────────────────────────────────────────────
@@ -323,17 +323,21 @@ app.get('/api/neighborhoods', async (_req, res) => {
 app.post('/api/admin/neighborhoods', async (req, res) => {
   const { name } = req.body;
   if (!name?.trim()) return res.status(400).json({ error: 'Name required' });
-  const list = await getSetting<string[]>('neighborhoods', DEFAULT_NEIGHBORHOODS);
-  if (list.includes(name.trim())) return res.status(400).json({ error: 'Already exists' });
-  list.push(name.trim());
-  await setSetting('neighborhoods', list);
-  res.json({ success: true, neighborhoods: list });
+  try {
+    const list = await getSetting<string[]>('neighborhoods', DEFAULT_NEIGHBORHOODS);
+    if (list.includes(name.trim())) return res.status(400).json({ error: 'Already exists' });
+    list.push(name.trim());
+    await setSetting('neighborhoods', list);
+    res.json({ success: true, neighborhoods: list });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
 });
 app.delete('/api/admin/neighborhoods/:name', async (req, res) => {
   const name = decodeURIComponent(req.params.name);
-  const list = await getSetting<string[]>('neighborhoods', DEFAULT_NEIGHBORHOODS);
-  await setSetting('neighborhoods', list.filter(n => n !== name));
-  res.json({ success: true });
+  try {
+    const list = await getSetting<string[]>('neighborhoods', DEFAULT_NEIGHBORHOODS);
+    await setSetting('neighborhoods', list.filter(n => n !== name));
+    res.json({ success: true });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
 });
 
 // ── Captains (drivers collection kept for Firestore compat) ───
@@ -955,43 +959,50 @@ app.get('/api/manager/finance/captains', async (_req, res) => {
 
 // ── Automation rules CRUD ─────────────────────────────────────
 app.get('/api/admin/automations', async (_req, res) => {
-  res.json({ automations: await getAutomations() });
+  try { res.json({ automations: await getAutomations() }); }
+  catch (e: any) { res.status(500).json({ error: e.message }); }
 });
 
 app.post('/api/admin/automations', async (req, res) => {
   const { automations } = req.body;
   if (!Array.isArray(automations)) return res.status(400).json({ error: 'automations must be array' });
-  await saveAutomations(automations);
-  res.json({ success: true });
+  try { await saveAutomations(automations); res.json({ success: true }); }
+  catch (e: any) { res.status(500).json({ error: e.message }); }
 });
 
 app.post('/api/admin/automations/add', async (req, res) => {
   const { trigger, recipientType, customPhone } = req.body;
   if (!trigger || !recipientType) return res.status(400).json({ error: 'Missing fields' });
-  const automations = await getAutomations();
-  const newRule: AutomationRule = {
-    id: `r_custom_${Date.now()}`,
-    enabled: true, trigger, recipientType, customPhone: customPhone || undefined,
-  };
-  await saveAutomations([...automations, newRule]);
-  res.json({ success: true, rule: newRule });
+  try {
+    const automations = await getAutomations();
+    const newRule: AutomationRule = {
+      id: `r_custom_${Date.now()}`,
+      enabled: true, trigger, recipientType, customPhone: customPhone || undefined,
+    };
+    await saveAutomations([...automations, newRule]);
+    res.json({ success: true, rule: newRule });
+  } catch (e: any) { res.status(500).json({ error: e.message || 'Server error' }); }
 });
 
 app.patch('/api/admin/automations/:id', async (req, res) => {
   const { id } = req.params;
-  const automations = await getAutomations();
-  const idx = automations.findIndex(r => r.id === id);
-  if (idx === -1) return res.status(404).json({ error: 'Rule not found' });
-  automations[idx] = { ...automations[idx], ...req.body, id };
-  await saveAutomations(automations);
-  res.json({ success: true, rule: automations[idx] });
+  try {
+    const automations = await getAutomations();
+    const idx = automations.findIndex(r => r.id === id);
+    if (idx === -1) return res.status(404).json({ error: 'Rule not found' });
+    automations[idx] = { ...automations[idx], ...req.body, id };
+    await saveAutomations(automations);
+    res.json({ success: true, rule: automations[idx] });
+  } catch (e: any) { res.status(500).json({ error: e.message || 'Server error' }); }
 });
 
 app.delete('/api/admin/automations/:id', async (req, res) => {
   const { id } = req.params;
-  const automations = await getAutomations();
-  await saveAutomations(automations.filter(r => r.id !== id));
-  res.json({ success: true });
+  try {
+    const automations = await getAutomations();
+    await saveAutomations(automations.filter(r => r.id !== id));
+    res.json({ success: true });
+  } catch (e: any) { res.status(500).json({ error: e.message || 'Server error' }); }
 });
 
 // ── Notification templates ────────────────────────────────────
@@ -1001,8 +1012,8 @@ app.get('/api/admin/notification-templates', async (_req, res) => {
 app.post('/api/admin/notification-templates', async (req, res) => {
   const { templates } = req.body;
   if (!templates) return res.status(400).json({ error: 'Missing templates' });
-  await setSetting('notification_templates', templates);
-  res.json({ success: true });
+  try { await setSetting('notification_templates', templates); res.json({ success: true }); }
+  catch (e: any) { res.status(500).json({ error: e.message }); }
 });
 
 // ── Test notifications ────────────────────────────────────────
