@@ -58,9 +58,8 @@ export default function CaptainView() {
     try {
       const res = await fetch(`/api/driver/tasks?driverId=${captainId}`);
       const data = await res.json();
-      const all: Task[] = data.tasks || [];
-      setTasks(all.filter(t => ['approved','accepted','on_road','on_process'].includes(t.status)));
-      setRecentDone(all.filter(t => t.status === 'completed').slice(0, 5));
+      setTasks(data.tasks || []);
+      setRecentDone(data.completed || []);
     } catch {}
     setLoading(false);
   }

@@ -710,10 +710,15 @@ app.get('/api/driver/tasks', async (req, res) => {
   const { driverId } = req.query;
   try {
     const snap = await getDocs(collection(db, 'bookings'));
-    const tasks = snap.docs
+    const all = snap.docs
       .map(d => ({ id: d.id, ...d.data() as any }))
-      .filter(b => b.driverId === driverId && ['approved','accepted','on_road','on_process'].includes(b.status));
-    res.json({ tasks });
+      .filter(b => b.driverId === driverId);
+    const tasks = all.filter(b => ['approved','accepted','on_road','on_process'].includes(b.status));
+    const completed = all
+      .filter(b => b.status === 'completed')
+      .sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''))
+      .slice(0, 10);
+    res.json({ tasks, completed });
   } catch { res.status(500).json({ error: 'Failed' }); }
 });
 
