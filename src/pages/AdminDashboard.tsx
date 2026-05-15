@@ -264,7 +264,6 @@ export default function AdminDashboard() {
   const [editingRuleId,    setEditingRuleId]    = useState<string | null>(null);
   const [addingRuleForEvent, setAddingRuleForEvent] = useState<EventKey | null>(null);
   const [addingStandaloneRule, setAddingStandaloneRule] = useState(false);
-  const [ruleLoading,      setRuleLoading]      = useState(false);
   const [showPreview,      setShowPreview]      = useState<Partial<Record<EventKey, boolean>>>({});
 
   useEffect(() => { loadAll(); }, []);
@@ -486,19 +485,19 @@ export default function AdminDashboard() {
   }
 
   async function addRule(data: Partial<AutomationRule>) {
-    setRuleLoading(true);
     const res = await fetch('/api/admin/automations/add', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     });
     const d = await res.json();
-    setRuleLoading(false);
     if (!res.ok || !d.rule) throw new Error(d.error || 'فشل الحفظ');
-    // Refresh from server to guarantee UI matches saved state
-    const fresh = await fetch('/api/admin/automations').then(r => r.json());
-    if (fresh.automations) setAutomations(fresh.automations);
+    // Optimistic update — close form immediately, refresh in background
+    setAutomations(prev => [...prev, d.rule]);
     setAddingRuleForEvent(null);
     setAddingStandaloneRule(false);
+    fetch('/api/admin/automations').then(r => r.json()).then(fresh => {
+      if (fresh.automations) setAutomations(fresh.automations);
+    }).catch(() => {});
   }
 
   async function saveEditRule(id: string, data: Partial<AutomationRule>) {
@@ -508,9 +507,12 @@ export default function AdminDashboard() {
     });
     const d = await res.json();
     if (!res.ok) throw new Error(d.error || 'فشل التعديل');
-    const fresh = await fetch('/api/admin/automations').then(r => r.json());
-    if (fresh.automations) setAutomations(fresh.automations);
+    // Optimistic update — close form immediately, refresh in background
+    setAutomations(prev => prev.map(r => r.id === id ? { ...r, ...data, id } : r));
     setEditingRuleId(null);
+    fetch('/api/admin/automations').then(r => r.json()).then(fresh => {
+      if (fresh.automations) setAutomations(fresh.automations);
+    }).catch(() => {});
   }
 
   // ── Render ────────────────────────────────────────────────────
