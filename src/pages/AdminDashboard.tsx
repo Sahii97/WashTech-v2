@@ -148,10 +148,16 @@ function RuleForm({
   const [recipient, setRecipient] = useState<RecipientType>(initial?.recipientType || 'manager');
   const [phone, setPhone]         = useState(initial?.customPhone || '');
   const [saving, setSaving]       = useState(false);
+  const [err, setErr]             = useState('');
 
   async function handleSave() {
+    setErr('');
     setSaving(true);
-    await onSave({ trigger, recipientType: recipient, customPhone: recipient === 'custom' ? phone : undefined });
+    try {
+      await onSave({ trigger, recipientType: recipient, customPhone: recipient === 'custom' ? phone : undefined });
+    } catch (e: any) {
+      setErr(e?.message || 'فشل الحفظ');
+    }
     setSaving(false);
   }
 
@@ -182,13 +188,14 @@ function RuleForm({
       {recipient === 'custom' && (
         <input type="tel" dir="ltr" placeholder="07XXXXXXXXX" value={phone} onChange={e => setPhone(e.target.value)} className={inp} />
       )}
+      {err && <p className="text-xs text-red-500 font-mono">{err}</p>}
       <div className="flex gap-2">
-        <button onClick={handleSave} disabled={saving || (recipient === 'custom' && !phone.trim())}
+        <button type="button" onClick={handleSave} disabled={saving || (recipient === 'custom' && !phone.trim())}
           className="flex-1 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white text-sm font-bold rounded-xl transition-colors flex items-center justify-center gap-1.5">
           <Check size={13} strokeWidth={3} />
           {saving ? 'جاري الحفظ...' : 'حفظ'}
         </button>
-        <button onClick={onCancel}
+        <button type="button" onClick={onCancel}
           className="px-3 py-2 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 text-sm font-semibold rounded-xl transition-colors">
           إلغاء
         </button>
@@ -256,6 +263,7 @@ export default function AdminDashboard() {
   // Automation CRUD state
   const [editingRuleId,    setEditingRuleId]    = useState<string | null>(null);
   const [addingRuleForEvent, setAddingRuleForEvent] = useState<EventKey | null>(null);
+  const [addingStandaloneRule, setAddingStandaloneRule] = useState(false);
   const [ruleLoading,      setRuleLoading]      = useState(false);
   const [showPreview,      setShowPreview]      = useState<Partial<Record<EventKey, boolean>>>({});
 
@@ -484,13 +492,24 @@ export default function AdminDashboard() {
       body: JSON.stringify(data),
     });
     const d = await res.json();
-    if (d.rule) setAutomations(prev => [...prev, d.rule]);
-    setAddingRuleForEvent(null);
     setRuleLoading(false);
+    if (!res.ok || !d.rule) throw new Error(d.error || 'فشل الحفظ');
+    // Refresh from server to guarantee UI matches saved state
+    const fresh = await fetch('/api/admin/automations').then(r => r.json());
+    if (fresh.automations) setAutomations(fresh.automations);
+    setAddingRuleForEvent(null);
+    setAddingStandaloneRule(false);
   }
 
   async function saveEditRule(id: string, data: Partial<AutomationRule>) {
-    await patchRule(id, data);
+    const res = await fetch(`/api/admin/automations/${id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    const d = await res.json();
+    if (!res.ok) throw new Error(d.error || 'فشل التعديل');
+    const fresh = await fetch('/api/admin/automations').then(r => r.json());
+    if (fresh.automations) setAutomations(fresh.automations);
     setEditingRuleId(null);
   }
 
@@ -552,20 +571,41 @@ export default function AdminDashboard() {
           {section === 'workflow' && (
             <div className="space-y-4">
               {/* Header + global toggle */}
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-3 flex-wrap">
                 <h2 className="font-bold text-slate-900 dark:text-white text-lg">الرسائل والأتمتة</h2>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-slate-500 dark:text-slate-400">إشعارات</span>
-                  <Toggle
-                    checked={appConfig.automationEnabled !== false}
-                    onChange={v => {
-                      const newCfg = { ...appConfig, automationEnabled: v };
-                      setAppConfig(newCfg);
-                      fetch('/api/admin/settings/app_config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ value: newCfg }) });
-                    }}
-                  />
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => { setAddingStandaloneRule(true); setAddingRuleForEvent(null); setEditingRuleId(null); }}
+                    className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl transition-colors"
+                  >
+                    <Plus size={13} strokeWidth={2.5} />
+                    قاعدة جديدة
+                  </button>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs text-slate-500 dark:text-slate-400">إشعارات</span>
+                    <Toggle
+                      checked={appConfig.automationEnabled !== false}
+                      onChange={v => {
+                        const newCfg = { ...appConfig, automationEnabled: v };
+                        setAppConfig(newCfg);
+                        fetch('/api/admin/settings/app_config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ value: newCfg }) });
+                      }}
+                    />
+                  </div>
                 </div>
               </div>
+
+              {/* Standalone add rule form */}
+              {addingStandaloneRule && (
+                <div className="bg-white dark:bg-slate-800 rounded-2xl border border-blue-300 dark:border-blue-700 p-4">
+                  <p className="text-sm font-semibold text-slate-900 dark:text-white mb-3">إضافة قاعدة أتمتة جديدة</p>
+                  <RuleForm
+                    onSave={addRule}
+                    onCancel={() => setAddingStandaloneRule(false)}
+                  />
+                </div>
+              )}
 
               {EVENT_META.map(meta => {
                 const cfg = templates[meta.key] || DEFAULT_TEMPLATES[meta.key];
