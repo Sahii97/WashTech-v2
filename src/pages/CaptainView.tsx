@@ -4,19 +4,23 @@ import { Car as IcCar, Phone as IcPhone, MapPin as IcMapPin, Clock as IcClock, C
 type Task = {
   id: string; name: string; phone: string; neighborhood: string;
   carType: string; package: string; date: string; slot: string; status: string;
+  financials?: { totalAmount: number; captainShare: number; companyShare: number };
 };
 type Captain = { id: string; name: string; code: string; phone?: string };
 
+const DEFAULT_PRICES: Record<string, number> = { basic: 15000, standard: 25000, premium: 35000, 'أساسي': 15000, 'قياسي': 25000, 'ممتاز': 35000 };
+
 export default function CaptainView() {
-  const [allCaptains, setAllCaptains] = useState<Captain[]>([]);
-  const [captain,     setCaptain]     = useState<Captain | null>(null);
-  const [tasks,       setTasks]       = useState<Task[]>([]);
-  const [recentDone,  setRecentDone]  = useState<Task[]>([]);
-  const [loading,     setLoading]     = useState(false);
+  const [allCaptains,  setAllCaptains]  = useState<Captain[]>([]);
+  const [captain,      setCaptain]      = useState<Captain | null>(null);
+  const [tasks,        setTasks]        = useState<Task[]>([]);
+  const [recentDone,   setRecentDone]   = useState<Task[]>([]);
+  const [loading,      setLoading]      = useState(false);
   const [captainsLoading, setCaptainsLoading] = useState(true);
-  const [confirmId,   setConfirmId]   = useState<string | null>(null);
-  const [tab,         setTab]         = useState<'active' | 'done'>('active');
-  const [actionError, setActionError] = useState<string | null>(null);
+  const [confirmId,    setConfirmId]    = useState<string | null>(null);
+  const [tab,          setTab]          = useState<'active' | 'done'>('active');
+  const [actionError,  setActionError]  = useState<string | null>(null);
+  const [pkgPrices,    setPkgPrices]    = useState<Record<string, number>>(DEFAULT_PRICES);
 
   useEffect(() => {
     fetch('/api/drivers')
@@ -28,7 +32,21 @@ export default function CaptainView() {
         if (list.length === 1) selectCaptain(list[0]);
       })
       .catch(() => setCaptainsLoading(false));
+    fetch('/api/admin/settings/finance_config')
+      .then(r => r.json())
+      .then(d => {
+        if (d?.value?.packagePrices) setPkgPrices({ ...DEFAULT_PRICES, ...d.value.packagePrices });
+      })
+      .catch(() => {});
   }, []);
+
+  function getPrice(pkg: string): number {
+    return pkgPrices[pkg] || pkgPrices[pkg?.toLowerCase()] || 0;
+  }
+
+  function fmtPrice(n: number): string {
+    return n > 0 ? n.toLocaleString('ar-IQ') + ' د.ع' : '—';
+  }
 
   async function selectCaptain(c: Captain) {
     setCaptain(c);
@@ -200,6 +218,10 @@ export default function CaptainView() {
               <p className="flex items-center gap-2"><IcMapPin className="w-4 h-4 text-slate-400 flex-shrink-0" />{task.neighborhood}</p>
               <p className="flex items-center gap-2"><IcCar className="w-4 h-4 text-slate-400 flex-shrink-0" />{task.carType} · {task.package}</p>
               <p className="flex items-center gap-2"><IcClock className="w-4 h-4 text-slate-400 flex-shrink-0" />{task.date === 'today' ? 'اليوم' : 'غداً'} — {task.slot}</p>
+              <div className="flex items-center gap-2 mt-1 pt-2 border-t border-slate-100 dark:border-slate-700">
+                <IcWallet className="w-4 h-4 text-green-500 flex-shrink-0" />
+                <span className="font-bold text-green-700 dark:text-green-400">{fmtPrice(getPrice(task.package))}</span>
+              </div>
             </div>
 
             {task.status === 'approved' && (
@@ -230,15 +252,27 @@ export default function CaptainView() {
             <p>لا توجد مهام مكتملة بعد</p>
           </div>
         )}
-        {tab === 'done' && recentDone.map(task => (
-          <div key={task.id} className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-5">
-            <div className="flex items-center justify-between mb-2">
-              <span className="font-semibold text-slate-900 dark:text-white">{task.name}</span>
-              <StatusBadge status={task.status} />
+        {tab === 'done' && recentDone.map(task => {
+          const paid = task.financials?.totalAmount ?? getPrice(task.package);
+          return (
+            <div key={task.id} className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-5">
+              <div className="flex items-center justify-between mb-3">
+                <span className="font-semibold text-slate-900 dark:text-white">{task.name}</span>
+                <StatusBadge status={task.status} />
+              </div>
+              <div className="space-y-1.5 text-sm text-slate-600 dark:text-slate-300">
+                <p className="flex items-center gap-2"><IcPhone className="w-4 h-4 text-slate-400 flex-shrink-0" /><span dir="ltr">{task.phone}</span></p>
+                <p className="flex items-center gap-2"><IcMapPin className="w-4 h-4 text-slate-400 flex-shrink-0" />{task.neighborhood}</p>
+                <p className="flex items-center gap-2"><IcCar className="w-4 h-4 text-slate-400 flex-shrink-0" />{task.carType} · {task.package}</p>
+                <p className="flex items-center gap-2"><IcClock className="w-4 h-4 text-slate-400 flex-shrink-0" />{task.date === 'today' ? 'اليوم' : 'غداً'} — {task.slot}</p>
+              </div>
+              <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-700 flex items-center justify-between">
+                <span className="text-xs text-slate-400">المبلغ المحصّل</span>
+                <span className="font-bold text-green-700 dark:text-green-400 text-base">{fmtPrice(paid)}</span>
+              </div>
             </div>
-            <p className="text-sm text-slate-500 dark:text-slate-400">{task.neighborhood} · {task.slot}</p>
-          </div>
-        ))}
+          );
+        })}
 
       </div>
 

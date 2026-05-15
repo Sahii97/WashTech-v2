@@ -5,7 +5,7 @@ type Booking = {
   id: string; name: string; phone: string; neighborhood: string;
   carType: string; package: string; date: string; slot: string;
   status: string; driverId?: string; createdAt: string;
-  captainShare?: number; companyShare?: number; price?: number;
+  financials?: { totalAmount: number; captainShare: number; companyShare: number };
 };
 type Driver = { id: string; name: string; code: string };
 type Tab = 'pending' | 'active' | 'completed' | 'rejected';
@@ -18,12 +18,15 @@ const STATUS_LABELS: Record<string, string> = {
 
 const ACTIVE_STATUSES = ['approved', 'accepted', 'on_process', 'on_road'];
 
+const DEFAULT_PRICES: Record<string, number> = { basic: 15000, standard: 25000, premium: 35000, 'أساسي': 15000, 'قياسي': 25000, 'ممتاز': 35000 };
+
 export default function ManagerDashboard() {
   const [bookings,        setBookings]        = useState<Booking[]>([]);
   const [drivers,         setDrivers]         = useState<Driver[]>([]);
   const [tab,             setTab]             = useState<Tab>('pending');
   const [selectedDrivers, setSelectedDrivers] = useState<Record<string, string>>({});
   const [loading,         setLoading]         = useState(false);
+  const [pkgPrices,       setPkgPrices]       = useState<Record<string, number>>(DEFAULT_PRICES);
 
 
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -31,8 +34,15 @@ export default function ManagerDashboard() {
   useEffect(() => {
     load();
     intervalRef.current = setInterval(() => load(), 10000);
+    fetch('/api/admin/settings/finance_config')
+      .then(r => r.json())
+      .then(d => { if (d?.value?.packagePrices) setPkgPrices({ ...DEFAULT_PRICES, ...d.value.packagePrices }); })
+      .catch(() => {});
     return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
   }, []);
+
+  function getPrice(pkg: string): number { return pkgPrices[pkg] || pkgPrices[pkg?.toLowerCase()] || 0; }
+  function fmtPrice(n: number): string { return n > 0 ? n.toLocaleString('ar-IQ') + ' د.ع' : '—'; }
 
   useEffect(() => {
   }, [tab]);
@@ -137,6 +147,10 @@ export default function ManagerDashboard() {
                   <p className="text-sm text-slate-500 dark:text-slate-400">{b.carType} · {b.package}</p>
                   <p className="text-sm font-medium text-slate-700 dark:text-slate-200 mt-1">
                     {b.date === 'today' ? 'اليوم' : 'غداً'} — {b.slot}
+                  </p>
+                  <p className="text-sm font-bold text-green-700 dark:text-green-400 mt-1 flex items-center gap-1">
+                    <IcDollar className="w-3.5 h-3.5" />
+                    {b.financials?.totalAmount ? fmtPrice(b.financials.totalAmount) : fmtPrice(getPrice(b.package))}
                   </p>
                   {b.driverId && (
                     <p className="text-xs text-blue-600 dark:text-blue-400 mt-1 flex items-center gap-1">
