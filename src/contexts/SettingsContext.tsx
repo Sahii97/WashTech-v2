@@ -62,8 +62,8 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const reload = useCallback(async () => {
     try {
       const [fRes, aRes] = await Promise.all([
-        fetch('/api/admin/settings/finance'),
-        fetch('/api/admin/settings/app'),
+        fetch('/api/admin/settings/finance_config'),
+        fetch('/api/admin/settings/app_config'),
       ]);
       if (fRes.ok) {
         const fd = await fRes.json();
@@ -82,7 +82,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => { reload(); }, [reload]);
 
   const saveFinance = useCallback(async (cfg: FinanceConfig) => {
-    await fetch('/api/admin/settings/finance', {
+    await fetch('/api/admin/settings/finance_config', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ value: cfg }),
@@ -91,7 +91,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const saveApp = useCallback(async (cfg: AppConfig) => {
-    await fetch('/api/admin/settings/app', {
+    await fetch('/api/admin/settings/app_config', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ value: cfg }),

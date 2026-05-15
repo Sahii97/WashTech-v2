@@ -236,6 +236,14 @@ export default function AdminDashboard() {
   const [automations,    setAutomations]    = useState<AutomationRule[]>([]);
   const [templates,      setTemplates]      = useState<Templates>(DEFAULT_TEMPLATES);
 
+  // Finance section state (section='finance' is not in nav but code references these)
+  const [finLoading,  setFinLoading]  = useState(false);
+  const [finOverview, setFinOverview] = useState<{ totalRevenue: number; companyRevenue: number; captainPayouts: number; completedCount: number } | null>(null);
+  const [finCaptains, setFinCaptains] = useState<(FinanceCaptain & { totalCollected?: number })[]>([]);
+  const [adjForm, setAdjForm] = useState<{ captainId: string; type: 'receipt' | 'withdrawal' | 'adjustment'; amount: string; note: string }>({ captainId: '', type: 'receipt', amount: '', note: '' });
+  const [adjLoading, setAdjLoading]  = useState(false);
+  const [adjMsg,     setAdjMsg]      = useState('');
+
 
 
   // Dynamic settings state
@@ -309,6 +317,22 @@ export default function AdminDashboard() {
   useEffect(() => { if (section === 'settings') loadSettingsConfig(); }, [section]);
 
   useEffect(() => { loadAll(); }, []);
+
+  const completedBookings = bookings.filter((b: any) => b.status === 'completed');
+  const totalRevenue = 0; // requires finance data; populated by loadFinance
+
+  async function loadFinance() {
+    setFinLoading(true);
+    try {
+      const res = await fetch('/api/admin/finance-overview').catch(() => null);
+      if (res?.ok) {
+        const d = await res.json();
+        setFinOverview(d.overview || null);
+        setFinCaptains(d.captains || []);
+      }
+    } catch {}
+    setFinLoading(false);
+  }
 
   async function submitAdjustment(e: React.FormEvent) {
     e.preventDefault();
