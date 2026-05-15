@@ -16,7 +16,7 @@ type Driver       = { id: string; name: string; code: string; phone?: string };
 type Manager      = { id: string; name: string; username: string };
 type EventKey     = 'new_booking' | 'booking_approved' | 'driver_accepted' | 'booking_rejected' | 'captain_on_road' | 'booking_completed';
 type RecipientType = 'manager' | 'captain' | 'customer' | 'custom';
-type Section      = 'dashboard' | 'workflow' | 'drivers' | 'managers' | 'locations' | 'settings';
+type Section      = 'workflow' | 'drivers' | 'managers' | 'settings';
 type FinanceCaptain = { id: string; name: string; phone?: string; balance: number; totalEarned: number; totalWithdrawn: number };
 
 interface TemplateConfig { enabled: boolean; template: string; }
@@ -69,12 +69,10 @@ const RECIPIENT_LABELS: Record<RecipientType, string> = {
 };
 
 const NAV: { key: Section; label: string; icon: React.ReactNode }[] = [
-  { key: 'dashboard', label: 'الرئيسية',         icon: <LayoutGrid  size={20} strokeWidth={1.5} /> },
-  { key: 'workflow',  label: 'الرسائل',          icon: <Bell        size={20} strokeWidth={1.5} /> },
-  { key: 'drivers',   label: 'الكباتن',          icon: <Car         size={20} strokeWidth={1.5} /> },
-  { key: 'managers',  label: 'المدراء',          icon: <Users       size={20} strokeWidth={1.5} /> },
-  { key: 'locations', label: 'المناطق',          icon: <MapPin      size={20} strokeWidth={1.5} /> },
-  { key: 'settings',  label: 'اعدادات المطور',  icon: <Terminal    size={20} strokeWidth={1.5} /> },
+  { key: 'workflow',  label: 'الرسائل',         icon: <Bell        size={20} strokeWidth={1.5} /> },
+  { key: 'drivers',   label: 'الكباتن',         icon: <Car         size={20} strokeWidth={1.5} /> },
+  { key: 'managers',  label: 'المدراء',         icon: <Users       size={20} strokeWidth={1.5} /> },
+  { key: 'settings',  label: 'اعدادات المطور', icon: <Terminal    size={20} strokeWidth={1.5} /> },
 ];
 
 const inp = 'w-full px-3 py-2.5 border border-slate-200 dark:border-slate-600 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 bg-white dark:bg-slate-700 dark:text-white dark:placeholder-slate-400 transition';
@@ -220,7 +218,7 @@ function RuleForm({
 
 // ── Main component ────────────────────────────────────────────
 export default function AdminDashboard() {
-  const [section, setSection] = useState<Section>('dashboard');
+  const [section, setSection] = useState<Section>('workflow');
   const [dark, setDark] = useState(() => localStorage.getItem('wt_dark') === '1');
 
   useEffect(() => {
@@ -572,64 +570,6 @@ export default function AdminDashboard() {
 
         <main className="flex-1 p-4 lg:p-6 pb-24 lg:pb-6 max-w-3xl">
 
-          {/* ── Dashboard ──────────────────────────────── */}
-          {section === 'dashboard' && (
-            <div className="space-y-4">
-              <h2 className="font-bold text-slate-900 dark:text-white text-lg">الرئيسية</h2>
-
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {[
-                  { label: 'الحجوزات', value: bookings.length,      color: 'text-blue-600'   },
-                  { label: 'الكباتن',  value: drivers.length,       color: 'text-green-600'  },
-                  { label: 'المواعيد', value: slots.length,          color: 'text-purple-600' },
-                  { label: 'المناطق',  value: neighborhoods.length,  color: 'text-orange-500' },
-                ].map(s => (
-                  <div key={s.label} className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-4">
-                    <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{s.label}</p>
-                  </div>
-                ))}
-              </div>
-
-
-
-              <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-5">
-                <h3 className="font-bold text-slate-900 dark:text-white mb-1">اختبار دورة كاملة</h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">حجز → موافقة → كابتن → عميل — واتساب حقيقي بروابط قصيرة</p>
-                <input type="tel" dir="ltr" placeholder="07XXXXXXXXX" value={testPhone}
-                  onChange={e => setTestPhone(e.target.value)} className={inp + ' mb-3'} />
-                <div className="flex items-center justify-between gap-3">
-                  <p className="text-xs text-slate-400 dark:text-slate-500">المدير يستقبل على رقمه · الكابتن على رقمه · العميل على الرقم أعلاه</p>
-                  <button onClick={simulate} disabled={simulating}
-                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-semibold rounded-xl transition-colors shrink-0">
-                    <Play size={16} strokeWidth={1.5} />
-                    {simulating ? 'جاري...' : 'تشغيل'}
-                  </button>
-                </div>
-                {simulating && simSteps.length === 0 && (
-                  <div className="flex items-center gap-2 text-slate-500 text-sm py-3 mt-2">
-                    <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-                    جاري تنفيذ الدورة...
-                  </div>
-                )}
-                {simSteps.length > 0 && (
-                  <div className="space-y-2 mt-3 pt-3 border-t border-slate-100 dark:border-slate-700">
-                    {simSteps.map((step, i) => (
-                      <div key={i} className="flex items-start gap-3 text-sm">
-                        <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 ${step.ok ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-500'}`}>
-                          {step.ok ? <Check size={13} strokeWidth={3} /> : <X size={13} strokeWidth={3} />}
-                        </div>
-                        <span className={`${step.ok ? 'text-slate-700 dark:text-slate-300' : 'text-red-600 dark:text-red-400'} break-all`}>{step.label}</span>
-                      </div>
-                    ))}
-                    {simSteps.every(s => s.ok) && (
-                      <p className="text-xs text-green-600 font-medium mt-1">✓ سير العمل يعمل بشكل صحيح</p>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
 
           {/* ── Workflow / Messages ─────────────────────── */}
           {section === 'workflow' && (
@@ -799,32 +739,6 @@ export default function AdminDashboard() {
             </div>
           )}
 
-          {/* ── Locations ──────────────────────────────── */}
-          {section === 'locations' && (
-            <div className="space-y-4">
-              <h2 className="font-bold text-slate-900 dark:text-white text-lg">المناطق</h2>
-              <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-5">
-                <form onSubmit={addNeighborhood} className="flex gap-2 mb-4">
-                  <input placeholder="اسم المنطقة" required className={inp + ' flex-1'} value={newNeighbor}
-                    onChange={e => setNewNeighbor(e.target.value)} />
-                  <button type="submit" className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl transition-colors">
-                    <span className="flex items-center gap-1"><Plus size={16} strokeWidth={2} /> إضافة</span>
-                  </button>
-                </form>
-                {neighborMsg && <p className={`text-sm mb-3 ${neighborMsg === 'تمت الإضافة' ? 'text-green-600' : 'text-red-500'}`}>{neighborMsg}</p>}
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                  {neighborhoods.map(n => (
-                    <div key={n} className="flex items-center justify-between bg-slate-50 dark:bg-slate-700 rounded-xl px-3 py-2">
-                      <span className="text-sm text-slate-700 dark:text-slate-200 truncate">{n}</span>
-                      <button onClick={() => deleteNeighborhood(n)} className="text-slate-300 hover:text-red-500 transition-colors mr-2 flex-shrink-0">
-                        <X size={13} strokeWidth={2.5} />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
 
           {/* ── Finance ────────────────────────────────── */}
           {section === 'finance' && (

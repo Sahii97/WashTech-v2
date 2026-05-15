@@ -19,6 +19,7 @@ export default function BookingPage() {
 
   const [gpsLoading, setGpsLoading] = useState(false);
   const [gpsError, setGpsError] = useState('');
+  const [gpsDetected, setGpsDetected] = useState(false);
 
   const [form, setForm] = useState({
     name: '', phone: '', neighborhood: '',
@@ -50,10 +51,11 @@ export default function BookingPage() {
           const match = list.find(n => detected.includes(n) || n.includes(detected));
           if (match) {
             set('neighborhood', match);
+            setGpsDetected(true);
           } else if (detected) {
-            setGpsError(lang === 'ar' ? `تم تحديد: ${detected} — اختر يدوياً` : `دۆزرایەوە: ${detected} — دەستی هەڵبژێرە`);
+            setGpsError(lang === 'ar' ? `لم يُطابق: ${detected} — اكتب المنطقة يدوياً` : `نەگنجا: ${detected} — دەستی بنووسە`);
           } else {
-            setGpsError(lang === 'ar' ? 'تعذّر تحديد المنطقة' : 'ناوچەکە نەدۆزرایەوە');
+            setGpsError(lang === 'ar' ? 'تعذّر تحديد المنطقة — اكتبها يدوياً' : 'ناوچەکە نەدۆزرایەوە — دەستی بنووسە');
           }
         } catch {
           setGpsError(lang === 'ar' ? 'خطأ في تحديد الموقع' : 'هەڵە لە دیاریکردنی شوێن');
@@ -173,28 +175,52 @@ export default function BookingPage() {
           {step === 2 && (
             <div className="space-y-4">
               <Field label={tr.neighborhood}>
-                <div className="flex gap-2 mb-2">
-                  <button
-                    type="button"
-                    onClick={detectLocation}
-                    disabled={gpsLoading}
-                    className="flex items-center gap-1.5 px-3 py-2 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 disabled:opacity-50 text-slate-700 dark:text-slate-200 text-xs font-medium rounded-xl transition-colors"
-                  >
-                    {gpsLoading ? (
-                      <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-                    ) : (
-                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                {gpsDetected ? (
+                  <div className="flex items-center justify-between bg-green-50 dark:bg-green-950 border-2 border-green-400 rounded-xl px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      <svg className="w-4 h-4 text-green-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                      <span className="text-sm font-semibold text-green-800 dark:text-green-300">{form.neighborhood}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => { setGpsDetected(false); setGpsError(''); set('neighborhood', ''); }}
+                      className="text-xs text-green-600 dark:text-green-400 hover:text-green-800 underline"
+                    >
+                      {lang === 'ar' ? 'تغيير' : 'گۆڕین'}
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    {!gpsError && (
+                      <button
+                        type="button"
+                        onClick={detectLocation}
+                        disabled={gpsLoading}
+                        className="w-full flex items-center justify-center gap-2 px-3 py-2.5 mb-2 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 disabled:opacity-50 text-slate-700 dark:text-slate-200 text-sm font-medium rounded-xl transition-colors"
+                      >
+                        {gpsLoading ? (
+                          <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                        ) : (
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                        )}
+                        {gpsLoading
+                          ? (lang === 'ar' ? 'جاري التحديد...' : 'دیاریکردن...')
+                          : (lang === 'ar' ? 'تحديد موقعي تلقائياً' : 'شوێنم ئۆتۆماتیکی دیاریبکە')}
+                      </button>
                     )}
-                    {lang === 'ar' ? 'تحديد موقعي' : 'شوێنم دیاریبکە'}
-                  </button>
-                </div>
-                {gpsError && <p className="text-xs text-amber-600 mb-2">{gpsError}</p>}
-                <input
-                  className={input}
-                  placeholder={lang === 'ar' ? 'اكتب اسم المنطقة...' : 'ناوی ناوچەکە بنووسە...'}
-                  value={form.neighborhood}
-                  onChange={e => set('neighborhood', e.target.value)}
-                />
+                    {gpsError && (
+                      <div className="mb-2">
+                        <p className="text-xs text-amber-600 mb-2">{gpsError}</p>
+                        <input
+                          className={input}
+                          placeholder={lang === 'ar' ? 'اكتب اسم المنطقة...' : 'ناوی ناوچەکە بنووسە...'}
+                          value={form.neighborhood}
+                          onChange={e => set('neighborhood', e.target.value)}
+                        />
+                      </div>
+                    )}
+                  </>
+                )}
               </Field>
               <Field label={tr.carType}>
                 <div className="grid grid-cols-2 gap-2">
