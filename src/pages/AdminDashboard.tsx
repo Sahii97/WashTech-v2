@@ -16,7 +16,7 @@ type Driver       = { id: string; name: string; code: string; phone?: string };
 type Manager      = { id: string; name: string; username: string };
 type EventKey     = 'new_booking' | 'booking_approved' | 'driver_accepted' | 'booking_rejected' | 'captain_on_road' | 'booking_completed';
 type RecipientType = 'manager' | 'captain' | 'customer' | 'custom';
-type Section      = 'dashboard' | 'workflow' | 'drivers' | 'managers' | 'locations' | 'finance' | 'settings';
+type Section      = 'dashboard' | 'workflow' | 'drivers' | 'managers' | 'locations' | 'settings';
 type FinanceCaptain = { id: string; name: string; phone?: string; balance: number; totalEarned: number; totalWithdrawn: number };
 
 interface TemplateConfig { enabled: boolean; template: string; }
@@ -37,7 +37,7 @@ const PREVIEW_VARS: Record<string, string> = {
   date: 'اليوم', slot: '10:00 AM',
   approveLink: 'washt.ch/go/AB1C', rejectLink: 'washt.ch/go/XY9Z',
   acceptLink: 'washt.ch/go/QR4W', driverName: 'علي محمد',
-  driverPhone: '07901234567', amount: '25,000',
+  driverPhone: '07901234567',
 };
 function renderPreview(template: string): string {
   return template.replace(/\{\{(\w+)\}\}/g, (_, k) => PREVIEW_VARS[k] ?? `[${k}]`);
@@ -49,7 +49,7 @@ const DEFAULT_TEMPLATES: Templates = {
   driver_accepted:   { enabled: true, template: '🚗 *الكابتن قبل مهمتك!*\n👨‍💼 الكابتن: {{driverName}}\n🕐 الوقت: {{slot}}\n\nسيصل قريباً. شكراً لاختيارك WashTech! 🧼' },
   booking_rejected:  { enabled: true, template: '❌ عذراً {{name}}،\nلم نتمكن من قبول حجزك في هذا الوقت.\nيرجى المحاولة مرة أخرى أو اختيار وقت آخر.\n\nWashTech 🚗' },
   captain_on_road:   { enabled: true, template: '🚀 *الكابتن في الطريق إليك!*\n👨‍💼 {{driverName}}\n🕐 الوقت: {{slot}}\n\nاستعد لاستقباله. شكراً! 🧼' },
-  booking_completed: { enabled: true, template: '✅ تم الانتهاء من خدمة غسيل سيارتك!\n💰 المبلغ: *{{amount}} د.ع*\nشكراً لاختيارك WashTech 🧼\nقيّم تجربتك: ⭐⭐⭐⭐⭐' },
+  booking_completed: { enabled: true, template: '✅ تم الانتهاء من خدمة غسيل سيارتك!\nشكراً لاختيارك WashTech 🧼\nقيّم تجربتك: ⭐⭐⭐⭐⭐' },
 };
 
 const EVENT_META: { key: EventKey; icon: string; label: string; ifLabel: string; vars: string[]; recipient: string }[] = [
@@ -58,7 +58,7 @@ const EVENT_META: { key: EventKey; icon: string; label: string; ifLabel: string;
   { key: 'driver_accepted',   icon: '🚗', label: 'قبول الكابتن',     ifLabel: 'قبل الكابتن المهمة',        recipient: 'يُرسل إلى: العميل',  vars: ['name','phone','driverName','slot'] },
   { key: 'booking_rejected',  icon: '❌', label: 'رفض الحجز',        ifLabel: 'رُفض الحجز',               recipient: 'يُرسل إلى: العميل',  vars: ['name','phone'] },
   { key: 'captain_on_road',   icon: '🚀', label: 'الكابتن في الطريق', ifLabel: 'انطلق الكابتن للعميل',     recipient: 'يُرسل إلى: العميل',  vars: ['name','phone','driverName','slot'] },
-  { key: 'booking_completed', icon: '💰', label: 'اكتمال الخدمة',    ifLabel: 'اكتملت الخدمة',            recipient: 'يُرسل إلى: العميل',  vars: ['name','phone','amount'] },
+  { key: 'booking_completed', icon: '✨', label: 'اكتمال الخدمة',    ifLabel: 'اكتملت الخدمة',            recipient: 'يُرسل إلى: العميل',  vars: ['name','phone'] },
 ];
 
 const RECIPIENT_LABELS: Record<RecipientType, string> = {
@@ -74,7 +74,6 @@ const NAV: { key: Section; label: string; icon: React.ReactNode }[] = [
   { key: 'drivers',   label: 'الكباتن',          icon: <Car         size={20} strokeWidth={1.5} /> },
   { key: 'managers',  label: 'المدراء',          icon: <Users       size={20} strokeWidth={1.5} /> },
   { key: 'locations', label: 'المناطق',          icon: <MapPin      size={20} strokeWidth={1.5} /> },
-  { key: 'finance',   label: 'المالية',          icon: <Wallet      size={20} strokeWidth={1.5} /> },
   { key: 'settings',  label: 'اعدادات المطور',  icon: <Terminal    size={20} strokeWidth={1.5} /> },
 ];
 
@@ -237,13 +236,7 @@ export default function AdminDashboard() {
   const [automations,    setAutomations]    = useState<AutomationRule[]>([]);
   const [templates,      setTemplates]      = useState<Templates>(DEFAULT_TEMPLATES);
 
-  // Finance state
-  const [finCaptains,    setFinCaptains]    = useState<FinanceCaptain[]>([]);
-  const [finOverview,    setFinOverview]    = useState<{ totalRevenue: number; companyRevenue: number; captainPayouts: number; completedCount: number } | null>(null);
-  const [adjForm,        setAdjForm]        = useState<{ captainId: string; type: 'adjustment'|'withdrawal'|'receipt'; amount: string; note: string }>({ captainId: '', type: 'receipt', amount: '', note: '' });
-  const [adjMsg,         setAdjMsg]         = useState('');
-  const [adjLoading,     setAdjLoading]     = useState(false);
-  const [finLoading,     setFinLoading]     = useState(false);
+
 
   // Dynamic settings state
   const [finConfig,      setFinConfig]      = useState({ captainSharePct: 70, basic: 15000, standard: 25000, premium: 35000 });
@@ -315,22 +308,7 @@ export default function AdminDashboard() {
 
   useEffect(() => { if (section === 'settings') loadSettingsConfig(); }, [section]);
 
-  async function loadFinance() {
-    setFinLoading(true);
-    try {
-      const [ov, ca] = await Promise.all([
-        fetch('/api/manager/finance/overview').then(r => r.json()),
-        fetch('/api/manager/finance/captains').then(r => r.json()),
-      ]);
-      setFinOverview(ov);
-      setFinCaptains(ca.captains || []);
-      if (ca.captains?.length) setAdjForm(p => ({ ...p, captainId: ca.captains[0].id }));
-    } catch {}
-    setFinLoading(false);
-  }
-
-  useEffect(() => { loadAll(); loadFinance(); }, []);
-  useEffect(() => { if (section === 'finance') loadFinance(); }, [section]);
+  useEffect(() => { loadAll(); }, []);
 
   async function submitAdjustment(e: React.FormEvent) {
     e.preventDefault();
@@ -363,11 +341,7 @@ export default function AdminDashboard() {
     setTimeout(() => setSettingsSaved(''), 2500);
   }
 
-  // Finance computed
-  const completedBookings = bookings.filter(b => ['completed', 'closed'].includes(b.status) && b.financials);
-  const totalRevenue   = completedBookings.reduce((s: number, b: any) => s + (b.financials?.totalAmount  || 0), 0);
-  const companyRevenue = completedBookings.reduce((s: number, b: any) => s + (b.financials?.companyShare || 0), 0);
-  const captainRevenue = completedBookings.reduce((s: number, b: any) => s + (b.financials?.captainShare || 0), 0);
+
 
   async function createDriver(e: React.FormEvent) {
     e.preventDefault();
@@ -583,26 +557,7 @@ export default function AdminDashboard() {
                 ))}
               </div>
 
-              {totalRevenue > 0 && (
-                <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-5">
-                  <div className="flex items-center gap-2 mb-4">
-                    <TrendingUp size={18} className="text-green-600" />
-                    <h3 className="font-bold text-slate-900 dark:text-white">الإيرادات — {completedBookings.length} مكتمل</h3>
-                  </div>
-                  <div className="grid grid-cols-3 gap-3 text-center">
-                    {[
-                      { label: 'إجمالي (د.ع)', val: totalRevenue,   cls: 'text-slate-900 dark:text-white' },
-                      { label: 'الشركة 30%',   val: companyRevenue, cls: 'text-green-700 dark:text-green-400' },
-                      { label: 'الكباتن 70%',  val: captainRevenue, cls: 'text-blue-700 dark:text-blue-400'  },
-                    ].map(s => (
-                      <div key={s.label} className="bg-slate-50 dark:bg-slate-700 rounded-xl p-3">
-                        <p className={`text-lg font-bold ${s.cls}`} dir="ltr">{s.val.toLocaleString()}</p>
-                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{s.label}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+
 
               <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-5">
                 <h3 className="font-bold text-slate-900 dark:text-white mb-1">اختبار دورة كاملة</h3>
@@ -1031,31 +986,6 @@ export default function AdminDashboard() {
                 )}
               </div>
 
-              {/* Finance config */}
-              <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-5">
-                <div className="flex items-center gap-2 mb-4">
-                  <DollarSign size={16} className="text-green-600" />
-                  <h3 className="font-bold text-slate-900 dark:text-white text-sm">إعدادات الماليات</h3>
-                </div>
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5">نسبة الكابتن (%)</label>
-                    <input type="number" min="0" max="100" value={finConfig.captainSharePct} onChange={e => setFinConfig(p => ({ ...p, captainSharePct: Number(e.target.value) }))} className={inp} dir="ltr" />
-                    <p className="text-xs text-slate-400 mt-1">نسبة الشركة: {100 - finConfig.captainSharePct}%</p>
-                  </div>
-                  <div className="grid grid-cols-3 gap-2">
-                    {(['basic','standard','premium'] as const).map(pkg => (
-                      <div key={pkg}>
-                        <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5">{pkg === 'basic' ? 'أساسي' : pkg === 'standard' ? 'قياسي' : 'ممتاز'} (د.ع)</label>
-                        <input type="number" min="0" value={finConfig[pkg]} onChange={e => setFinConfig(p => ({ ...p, [pkg]: Number(e.target.value) }))} className={inp} dir="ltr" />
-                      </div>
-                    ))}
-                  </div>
-                  <button onClick={saveFinanceConfig} disabled={settingsLoading} className={`w-full py-2.5 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${settingsSaved === 'finance' ? 'bg-green-500 text-white' : 'bg-blue-600 hover:bg-blue-700 text-white'} disabled:opacity-50`}>
-                    <Save size={14} />{settingsSaved === 'finance' ? '✓ تم الحفظ' : 'حفظ إعدادات الماليات'}
-                  </button>
-                </div>
-              </div>
 
               {/* App config */}
               <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-5">

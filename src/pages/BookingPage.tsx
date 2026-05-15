@@ -17,7 +17,7 @@ export default function BookingPage() {
   const [errorMsg, setErrorMsg] = useState('');
   const [slots, setSlots] = useState<string[]>([]);
   const [neighborhoods, setNeighborhoods] = useState<string[]>([]);
-  const [packagePrices, setPackagePrices] = useState<Record<string, number>>({});
+
   const [gpsLoading, setGpsLoading] = useState(false);
   const [gpsError, setGpsError] = useState('');
   const [trackOpen, setTrackOpen] = useState(false);
@@ -30,9 +30,6 @@ export default function BookingPage() {
   useEffect(() => {
     fetch('/api/slots').then(r => r.json()).then(d => setSlots(d.slots || []));
     fetch('/api/neighborhoods').then(r => r.json()).then(d => setNeighborhoods(d.neighborhoods || []));
-    fetch('/api/admin/settings/finance_config').then(r => r.json()).then(d => {
-      if (d.value?.packagePrices) setPackagePrices(d.value.packagePrices);
-    }).catch(() => {});
   }, []);
 
   const set = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }));
@@ -243,20 +240,16 @@ export default function BookingPage() {
               </Field>
               <Field label={tr.package}>
                 <div className="space-y-2">
-                  {Object.entries(tr.packages).map(([k, v]) => {
-                    const price = packagePrices[k];
-                    const displayLabel = price ? `${v} — ${price.toLocaleString('ar-IQ')} د.ع` : v;
-                    return (
+                  {Object.entries(tr.packages).map(([k, v]) => (
                       <button
                         key={k}
                         type="button"
                         onClick={() => set('package', k)}
                         className={`w-full p-3 rounded-xl border-2 text-sm font-medium text-start transition-all ${form.package === k ? 'border-brand-600 bg-brand-50 text-brand-700' : 'border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-200 hover:border-slate-300 dark:hover:border-slate-500'}`}
                       >
-                        {displayLabel}
+                        {v}
                       </button>
-                    );
-                  })}
+                  ))}
                 </div>
               </Field>
             </div>
