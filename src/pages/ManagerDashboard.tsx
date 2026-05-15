@@ -75,8 +75,6 @@ export default function ManagerDashboard() {
     rejected:  bookings.filter(b => b.status === 'rejected').length,
   };
 
-  const completedB = bookings.filter(b => ['completed', 'closed'].includes(b.status));
-  const companyRevenue = completedB.reduce((s: number, b: any) => s + (b.financials?.companyShare || b.companyShare || 0), 0);
 
   const BOOKING_TABS: { key: typeof bookingTabs[number]; label: string; color: string }[] = [
     { key: 'pending',   label: 'قيد الانتظار',  color: 'text-amber-600' },
@@ -100,33 +98,6 @@ export default function ManagerDashboard() {
         </button>
       </header>
 
-      {/* Revenue summary bar */}
-      {totalRevenue > 0 && tab !== 'finance' && (
-        <div className="max-w-4xl mx-auto px-4 pt-4">
-          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-4 flex items-center gap-4 flex-wrap">
-            <div className="w-9 h-9 bg-green-100 rounded-xl flex items-center justify-center">
-              <IcDollar className="w-5 h-5 text-green-600" />
-            </div>
-            <div className="flex gap-6 flex-wrap text-sm">
-              <div>
-                <p className="text-slate-500 dark:text-slate-400 text-xs">إجمالي الإيرادات</p>
-                <p className="font-bold text-slate-900 dark:text-white" dir="ltr">{totalRevenue.toLocaleString()} IQD</p>
-              </div>
-              <div>
-                <p className="text-slate-500 dark:text-slate-400 text-xs">حصة الشركة (30%)</p>
-                <p className="font-bold text-green-600" dir="ltr">{companyRevenue.toLocaleString()} IQD</p>
-              </div>
-              <div>
-                <p className="text-slate-500 dark:text-slate-400 text-xs">حصة الكباتن (70%)</p>
-                <p className="font-bold text-blue-600" dir="ltr">{(totalRevenue - companyRevenue).toLocaleString()} IQD</p>
-              </div>
-            </div>
-            <button onClick={() => setTab('finance')} className="mr-auto text-xs text-blue-600 hover:underline font-medium">
-              عرض التفاصيل المالية ←
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* Main nav tabs */}
       <div className="max-w-4xl mx-auto px-4 pt-4">
@@ -145,111 +116,7 @@ export default function ManagerDashboard() {
         </div>
       </div>
 
-      {/* ── Finance Tab ─────────────────────────────────────────── */}
-      {tab === 'finance' && (
-        <div className="max-w-4xl mx-auto px-4 pb-10 space-y-4">
-          {/* Loading */}
-          {finLoading && !finOverview && (
-            <div className="flex flex-col items-center py-16 gap-3">
-              <div className="w-8 h-8 border-2 border-green-500 border-t-transparent rounded-full animate-spin" />
-              <p className="text-sm text-slate-400">جاري تحميل البيانات المالية...</p>
-            </div>
-          )}
 
-          {/* Overview cards */}
-          {finOverview && (
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              {[
-                { label: 'إجمالي الإيرادات', val: finOverview.totalRevenue   ?? 0, cls: 'text-slate-900 dark:text-white',       icon: <TrendingUp     className="w-4 h-4 text-green-500" /> },
-                { label: 'حصة الشركة',        val: finOverview.companyRevenue ?? 0, cls: 'text-green-700 dark:text-green-400',   icon: <ArrowUpRight   className="w-4 h-4 text-green-500" /> },
-                { label: 'حصة الكباتن',       val: finOverview.captainPayouts ?? 0, cls: 'text-blue-700 dark:text-blue-400',    icon: <ArrowDownLeft  className="w-4 h-4 text-blue-500"  /> },
-                { label: 'حجوزات مكتملة',     val: finOverview.completedCount ?? 0, cls: 'text-slate-700 dark:text-slate-300',  icon: <IcCheck        className="w-4 h-4 text-slate-400"  />, noFormat: true },
-              ].map(s => (
-                <div key={s.label} className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-4">
-                  <div className="flex items-center gap-1.5 mb-1">{s.icon}<p className="text-xs text-slate-500 dark:text-slate-400">{s.label}</p></div>
-                  <p className={`text-lg font-bold ${s.cls}`} dir="ltr">{(s as any).noFormat ? (s.val ?? 0) : (s.val ?? 0).toLocaleString()}</p>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Per-captain wallets */}
-          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden">
-            <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-700 flex items-center gap-2">
-              <IcWallet className="w-4 h-4 text-green-600" />
-              <h3 className="font-bold text-slate-900 dark:text-white text-sm">محافظ الكباتن</h3>
-            </div>
-            {finCaptains.length === 0 && !finLoading && (
-              <p className="text-center text-slate-400 text-sm py-8">لا يوجد كباتن بعد</p>
-            )}
-            {finCaptains.map(c => (
-              <div key={c.id} className="flex items-center justify-between px-5 py-3.5 border-b border-slate-50 dark:border-slate-700 last:border-0 flex-wrap gap-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center flex-shrink-0">
-                    <span className="text-blue-700 dark:text-blue-300 font-bold text-sm">{c.name.charAt(0)}</span>
-                  </div>
-                  <div>
-                    <p className="font-semibold text-slate-900 dark:text-white text-sm">{c.name}</p>
-                    {c.phone && <p className="text-xs text-slate-400 font-mono" dir="ltr">{c.phone}</p>}
-                  </div>
-                </div>
-                <div className="flex gap-5 text-xs">
-                  <div className="text-center">
-                    <p className="text-slate-400 mb-0.5">الرصيد</p>
-                    <p className="font-bold text-green-600" dir="ltr">{(c.balance ?? 0).toLocaleString()}</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-slate-400 mb-0.5">مكتسب</p>
-                    <p className="font-bold text-blue-600" dir="ltr">{(c.totalEarned ?? 0).toLocaleString()}</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-slate-400 mb-0.5">مسحوب</p>
-                    <p className="font-bold text-red-500" dir="ltr">{(c.totalWithdrawn ?? 0).toLocaleString()}</p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Manual adjustment */}
-          {finCaptains.length > 0 && (
-            <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-5">
-              <h3 className="font-bold text-slate-900 dark:text-white text-sm mb-4 flex items-center gap-2">
-                <IcDollar className="w-4 h-4 text-blue-500" />
-                تسوية مالية يدوية
-              </h3>
-              <form onSubmit={submitAdjustment} className="space-y-3">
-                <div className="flex gap-2">
-                  <div className="relative flex-1">
-                    <select value={adjForm.captainId} onChange={e => setAdjForm(p => ({ ...p, captainId: e.target.value }))} className={inp + ' appearance-none'}>
-                      {finCaptains.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                    </select>
-                    <ChevronDown size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-                  </div>
-                  <div className="relative">
-                    <select value={adjForm.type} onChange={e => setAdjForm(p => ({ ...p, type: e.target.value as any }))} className={inp + ' appearance-none w-auto'}>
-                      <option value="adjustment">إضافة رصيد</option>
-                      <option value="withdrawal">سحب رصيد</option>
-                    </select>
-                    <ChevronDown size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <input type="number" placeholder="المبلغ (د.ع)" required min="1" value={adjForm.amount}
-                    onChange={e => setAdjForm(p => ({ ...p, amount: e.target.value }))} className={inp + ' flex-1'} dir="ltr" />
-                  <input placeholder="ملاحظة (اختياري)" value={adjForm.note}
-                    onChange={e => setAdjForm(p => ({ ...p, note: e.target.value }))} className={inp + ' flex-1'} />
-                </div>
-                <button type="submit" disabled={adjLoading}
-                  className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold rounded-xl text-sm transition-colors">
-                  {adjLoading ? 'جاري...' : 'تطبيق التسوية'}
-                </button>
-                {adjMsg && <p className={`text-sm text-center font-medium ${adjMsg.startsWith('✓') ? 'text-green-600' : 'text-red-500'}`}>{adjMsg}</p>}
-              </form>
-            </div>
-          )}
-        </div>
-      )}
 
       {/* ── Bookings Tab ─────────────────────────────────────────── */}
         <div className="max-w-4xl mx-auto px-4 pb-10 space-y-3">
