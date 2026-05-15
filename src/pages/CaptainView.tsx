@@ -95,7 +95,7 @@ export default function CaptainView() {
       body: JSON.stringify({ bookingId: taskId, driverId: captain?.id }),
     });
     if (!res.ok) { const d = await res.json(); setActionError(d.error || 'خطأ'); return; }
-    if (captain) { loadTasks(captain.id); setTab('done'); }
+    if (captain) { await loadTasks(captain.id); setTab('done'); }
   }
 
   // ── Captain picker ───────────────────────────────────────────

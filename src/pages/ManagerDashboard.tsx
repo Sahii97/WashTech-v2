@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Check as IcCheck, X as IcX, RefreshCw as IcRefresh, ChevronDown, DollarSign as IcDollar, User as IcUser, Wallet as IcWallet, TrendingUp, ArrowUpRight, ArrowDownLeft } from 'lucide-react';
+import { Check as IcCheck, X as IcX, RefreshCw as IcRefresh, ChevronDown, Banknote as IcDollar, User as IcUser, Wallet as IcWallet, TrendingUp, ArrowUpRight, ArrowDownLeft } from 'lucide-react';
 
 type Booking = {
   id: string; name: string; phone: string; neighborhood: string;
