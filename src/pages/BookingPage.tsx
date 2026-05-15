@@ -292,13 +292,6 @@ export default function BookingPage() {
           {status === 'error' && <p className="mt-3 text-sm text-red-600 text-center">{errorMsg}</p>}
         </div>
 
-        {/* Track link */}
-        <div className="mt-4 text-center">
-          <a href="/track" className="inline-flex items-center gap-1.5 text-sm text-slate-400 dark:text-slate-500 hover:text-brand-600 transition-colors">
-            <IcSearch className="w-4 h-4" />
-            {lang === 'ar' ? 'تتبع حجز سابق' : 'حجزێکی پێشوو شوێندەکەوە'}
-          </a>
-        </div>
       </main>
     </div>
   );
