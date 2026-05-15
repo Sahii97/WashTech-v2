@@ -34,6 +34,11 @@ export default function BookingPage() {
 
   const set = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }));
 
+  function localizeSlot(s: string): string {
+    if (lang === 'ar') return s;
+    return s.replace('صباحاً', 'بەیانی').replace('مساءاً', 'ئێوارە').replace('منتصف الليل', 'نیوەشەو');
+  }
+
   async function detectLocation() {
     if (!navigator.geolocation) { setGpsError(lang === 'ar' ? 'GPS غير مدعوم' : 'GPS نەگنجاو'); return; }
     setGpsLoading(true);
@@ -133,7 +138,7 @@ export default function BookingPage() {
             </div>
             <div className="flex justify-between">
               <span className="text-slate-500 dark:text-slate-400">{tr.date}</span>
-              <span className="font-semibold text-slate-900 dark:text-white">{dateLabel} — {form.slot}</span>
+              <span className="font-semibold text-slate-900 dark:text-white">{dateLabel} — {localizeSlot(form.slot)}</span>
             </div>
           </div>
 
@@ -289,7 +294,7 @@ export default function BookingPage() {
                 >
                   <option value="">{lang === 'ar' ? '— اختر الوقت —' : '— کاتەکە هەڵبژێرە —'}</option>
                   {(slots.length ? slots : tr.slots).map(s => (
-                    <option key={s} value={s}>{s}</option>
+                    <option key={s} value={s}>{localizeSlot(s)}</option>
                   ))}
                 </select>
               </Field>

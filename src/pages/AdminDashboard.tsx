@@ -136,16 +136,18 @@ function WaEditor({ value, onChange, rows, textareaRef }: {
 
 // ── Automation rule add/edit form ─────────────────────────────
 function RuleForm({
-  initial, onSave, onCancel,
+  initial, onSave, onCancel, hideIf, fixedTrigger,
 }: {
   initial?: Partial<AutomationRule>;
   onSave: (data: Partial<AutomationRule>) => Promise<void>;
   onCancel: () => void;
+  hideIf?: boolean;
+  fixedTrigger?: EventKey;
 }) {
-  const [trigger, setTrigger]       = useState<EventKey>((initial?.trigger as EventKey) || 'new_booking');
-  const [recipient, setRecipient]   = useState<RecipientType>(initial?.recipientType || 'manager');
-  const [phone, setPhone]           = useState(initial?.customPhone || '');
-  const [saving, setSaving]         = useState(false);
+  const [trigger, setTrigger]     = useState<EventKey>(fixedTrigger || (initial?.trigger as EventKey) || 'new_booking');
+  const [recipient, setRecipient] = useState<RecipientType>(initial?.recipientType || 'manager');
+  const [phone, setPhone]         = useState(initial?.customPhone || '');
+  const [saving, setSaving]       = useState(false);
 
   async function handleSave() {
     setSaving(true);
@@ -154,30 +156,22 @@ function RuleForm({
   }
 
   return (
-    <div className="bg-slate-50 dark:bg-slate-900 rounded-2xl border border-blue-200 dark:border-blue-800 p-4 space-y-3">
-      <div>
-        <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5">إذا: (الحدث)</label>
-        <div className="relative">
-          <select
-            value={trigger}
-            onChange={e => setTrigger(e.target.value as EventKey)}
-            className={inp + ' appearance-none pr-8'}
-          >
-            {EVENT_META.map(m => (
-              <option key={m.key} value={m.key}>{m.ifLabel}</option>
-            ))}
-          </select>
-          <ChevronDown size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+    <div className="bg-slate-50 dark:bg-slate-900 rounded-xl border border-blue-200 dark:border-blue-800 p-3 space-y-2.5">
+      {!hideIf && (
+        <div>
+          <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5">إذا: (الحدث)</label>
+          <div className="relative">
+            <select value={trigger} onChange={e => setTrigger(e.target.value as EventKey)} className={inp + ' appearance-none pr-8'}>
+              {EVENT_META.map(m => <option key={m.key} value={m.key}>{m.ifLabel}</option>)}
+            </select>
+            <ChevronDown size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+          </div>
         </div>
-      </div>
+      )}
       <div>
-        <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5">إذن: أرسل واتساب إلى</label>
+        <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5">أرسل واتساب إلى</label>
         <div className="relative">
-          <select
-            value={recipient}
-            onChange={e => setRecipient(e.target.value as RecipientType)}
-            className={inp + ' appearance-none pr-8'}
-          >
+          <select value={recipient} onChange={e => setRecipient(e.target.value as RecipientType)} className={inp + ' appearance-none pr-8'}>
             {(Object.entries(RECIPIENT_LABELS) as [RecipientType, string][]).map(([k, v]) => (
               <option key={k} value={k}>{v}</option>
             ))}
@@ -186,31 +180,16 @@ function RuleForm({
         </div>
       </div>
       {recipient === 'custom' && (
-        <input
-          type="tel"
-          dir="ltr"
-          placeholder="07XXXXXXXXX"
-          value={phone}
-          onChange={e => setPhone(e.target.value)}
-          className={inp}
-        />
+        <input type="tel" dir="ltr" placeholder="07XXXXXXXXX" value={phone} onChange={e => setPhone(e.target.value)} className={inp} />
       )}
-      <p className="text-xs text-slate-400 dark:text-slate-500">
-        نص الرسالة يُعدَّل في قسم الرسائل بجانب اسم الحدث
-      </p>
-      <div className="flex gap-2 pt-1">
-        <button
-          onClick={handleSave}
-          disabled={saving || (recipient === 'custom' && !phone.trim())}
-          className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white text-sm font-bold rounded-xl transition-colors flex items-center justify-center gap-2"
-        >
-          <Check size={14} strokeWidth={3} />
-          {saving ? 'جاري الحفظ...' : 'حفظ القاعدة'}
+      <div className="flex gap-2">
+        <button onClick={handleSave} disabled={saving || (recipient === 'custom' && !phone.trim())}
+          className="flex-1 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white text-sm font-bold rounded-xl transition-colors flex items-center justify-center gap-1.5">
+          <Check size={13} strokeWidth={3} />
+          {saving ? 'جاري الحفظ...' : 'حفظ'}
         </button>
-        <button
-          onClick={onCancel}
-          className="px-4 py-2.5 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 text-sm font-semibold rounded-xl transition-colors"
-        >
+        <button onClick={onCancel}
+          className="px-3 py-2 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 text-sm font-semibold rounded-xl transition-colors">
           إلغاء
         </button>
       </div>
@@ -275,9 +254,10 @@ export default function AdminDashboard() {
   const [simSteps,   setSimSteps]   = useState<{ label: string; ok: boolean }[]>([]);
 
   // Automation CRUD state
-  const [editingRuleId, setEditingRuleId] = useState<string | null>(null);
-  const [addingRule,    setAddingRule]    = useState(false);
-  const [ruleLoading,   setRuleLoading]   = useState(false);
+  const [editingRuleId,    setEditingRuleId]    = useState<string | null>(null);
+  const [addingRuleForEvent, setAddingRuleForEvent] = useState<EventKey | null>(null);
+  const [ruleLoading,      setRuleLoading]      = useState(false);
+  const [showPreview,      setShowPreview]      = useState<Partial<Record<EventKey, boolean>>>({});
 
   useEffect(() => { loadAll(); }, []);
 
@@ -319,7 +299,7 @@ export default function AdminDashboard() {
     } catch {}
   }
 
-  useEffect(() => { if (section === 'settings') loadSettingsConfig(); }, [section]);
+  useEffect(() => { if (section === 'settings' || section === 'workflow') loadSettingsConfig(); }, [section]);
 
   useEffect(() => { loadAll(); }, []);
 
@@ -505,7 +485,7 @@ export default function AdminDashboard() {
     });
     const d = await res.json();
     if (d.rule) setAutomations(prev => [...prev, d.rule]);
-    setAddingRule(false);
+    setAddingRuleForEvent(null);
     setRuleLoading(false);
   }
 
@@ -568,30 +548,98 @@ export default function AdminDashboard() {
         <main className="flex-1 p-4 lg:p-6 pb-24 lg:pb-6 max-w-3xl">
 
 
-          {/* ── Workflow / Messages ─────────────────────── */}
+          {/* ── Workflow: Messages + Automation ─────────── */}
           {section === 'workflow' && (
             <div className="space-y-4">
-              <h2 className="font-bold text-slate-900 dark:text-white text-lg">قوالب الرسائل</h2>
+              {/* Header + global toggle */}
+              <div className="flex items-center justify-between">
+                <h2 className="font-bold text-slate-900 dark:text-white text-lg">الرسائل والأتمتة</h2>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-slate-500 dark:text-slate-400">إشعارات</span>
+                  <Toggle
+                    checked={appConfig.automationEnabled !== false}
+                    onChange={v => {
+                      const newCfg = { ...appConfig, automationEnabled: v };
+                      setAppConfig(newCfg);
+                      fetch('/api/admin/settings/app_config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ value: newCfg }) });
+                    }}
+                  />
+                </div>
+              </div>
 
               {EVENT_META.map(meta => {
                 const cfg = templates[meta.key] || DEFAULT_TEMPLATES[meta.key];
+                const eventRules = automations.filter(r => r.trigger === meta.key);
+                const isPreviewOpen = showPreview[meta.key] || false;
+                const isAddingForThis = addingRuleForEvent === meta.key;
+                const now = new Date().toLocaleTimeString('ar', { hour: '2-digit', minute: '2-digit' });
                 return (
                   <div key={meta.key} className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-5">
-                    <div className="flex items-start justify-between mb-3 gap-2">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-slate-600 dark:text-slate-300">{meta.icon}</span>
+                    {/* Event header */}
+                    <div className="flex items-start justify-between mb-4 gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-slate-500 dark:text-slate-400">{meta.icon}</span>
+                        <div>
                           <p className="font-semibold text-slate-900 dark:text-white text-sm">{meta.label}</p>
+                          <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">{meta.ifLabel}</p>
                         </div>
-                        <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5 mr-7">{meta.recipient}</p>
                       </div>
-                      <Toggle
-                        checked={cfg.enabled}
-                        onChange={v => setTemplates(p => ({ ...p, [meta.key]: { ...p[meta.key], enabled: v } }))}
-                      />
+                      <Toggle checked={cfg.enabled} onChange={v => setTemplates(p => ({ ...p, [meta.key]: { ...p[meta.key], enabled: v } }))} />
                     </div>
+
                     {cfg.enabled && (
                       <>
+                        {/* Automation recipients (إذن) */}
+                        <div className="mb-4 bg-slate-50 dark:bg-slate-700/40 rounded-xl p-3">
+                          <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2 flex items-center gap-1">
+                            <Zap size={11} className="text-green-500" />
+                            إذن: أرسل إلى
+                          </p>
+                          <div className="space-y-1.5">
+                            {eventRules.map(rule =>
+                              editingRuleId === rule.id ? (
+                                <RuleForm
+                                  key={rule.id}
+                                  initial={rule}
+                                  hideIf
+                                  onSave={data => saveEditRule(rule.id, data)}
+                                  onCancel={() => setEditingRuleId(null)}
+                                />
+                              ) : (
+                                <div key={rule.id} className={`flex items-center gap-2 rounded-lg px-3 py-2 transition-opacity ${rule.enabled ? '' : 'opacity-50'}`} style={{ background: 'rgba(0,0,0,0.03)' }}>
+                                  <span className="flex-1 text-sm font-medium text-slate-800 dark:text-slate-200">
+                                    {RECIPIENT_LABELS[rule.recipientType]}
+                                    {rule.customPhone && <span className="font-mono text-xs text-slate-400 mr-2" dir="ltr">{rule.customPhone}</span>}
+                                  </span>
+                                  <Toggle checked={rule.enabled} onChange={v => patchRule(rule.id, { enabled: v })} />
+                                  <button onClick={() => { setEditingRuleId(rule.id); setAddingRuleForEvent(null); }} className="p-1.5 text-slate-400 hover:text-blue-500 rounded-lg transition-colors"><Pencil size={12} /></button>
+                                  <button onClick={() => deleteRule(rule.id)} className="p-1.5 text-slate-400 hover:text-red-500 rounded-lg transition-colors"><Trash2 size={12} /></button>
+                                </div>
+                              )
+                            )}
+                            {eventRules.length === 0 && !isAddingForThis && (
+                              <p className="text-xs text-slate-400 dark:text-slate-500 py-0.5">لم تُضف أي مستلم — أضف واحداً أدناه</p>
+                            )}
+                            {isAddingForThis && (
+                              <RuleForm
+                                hideIf
+                                fixedTrigger={meta.key}
+                                onSave={async data => { await addRule({ ...data, trigger: meta.key }); }}
+                                onCancel={() => setAddingRuleForEvent(null)}
+                              />
+                            )}
+                          </div>
+                          {!isAddingForThis && (
+                            <button
+                              onClick={() => { setAddingRuleForEvent(meta.key); setEditingRuleId(null); }}
+                              className="mt-2 flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 dark:text-blue-400 font-semibold"
+                            >
+                              <Plus size={12} /> إضافة مستلم
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Variable chips */}
                         <div className="flex flex-wrap gap-1.5 mb-3">
                           {meta.vars.map(v => (
                             <button key={v} type="button" onClick={() => insertVar(meta.key, v)}
@@ -600,19 +648,50 @@ export default function AdminDashboard() {
                             </button>
                           ))}
                         </div>
-                        <WaEditor
-                          value={cfg.template}
-                          onChange={v => setTemplates(p => ({ ...p, [meta.key]: { ...p[meta.key], template: v } }))}
-                          rows={5}
-                          textareaRef={el => { textareaRefs.current[meta.key] = el; }}
-                        />
-                        <div className="flex gap-2 mt-3">
+
+                        {/* WhatsApp preview (collapsible) */}
+                        {isPreviewOpen && (
+                          <div className="mb-3 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-600">
+                            <div className="bg-[#e5ddd5] dark:bg-[#0c1317] px-3 py-3">
+                              <p className="text-[10px] text-slate-500 dark:text-slate-400 mb-2 font-medium uppercase tracking-wide">معاينة الرسالة</p>
+                              <MessageCard from="WashTech" body={renderPreview(cfg.template) || '...'} time={now} compact={false} />
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Message textarea */}
+                        <div className="bg-[#f0f2f5] dark:bg-slate-900/50 flex items-end gap-2 px-3 py-2 rounded-2xl border border-slate-200 dark:border-slate-600 mb-3">
+                          <textarea
+                            ref={el => { textareaRefs.current[meta.key] = el; }}
+                            value={cfg.template}
+                            onChange={e => setTemplates(p => ({ ...p, [meta.key]: { ...p[meta.key], template: e.target.value } }))}
+                            rows={4}
+                            dir="auto"
+                            placeholder="نص الرسالة... استخدم {{المتغير}} لبيانات ديناميكية"
+                            className="flex-1 bg-white dark:bg-slate-700 border-0 rounded-xl text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 px-3 py-2.5 resize-none focus:outline-none focus:ring-2 focus:ring-blue-400/30 font-mono"
+                          />
+                          <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center flex-shrink-0 mb-0.5">
+                            <Send size={14} strokeWidth={2} className="text-white" />
+                          </div>
+                        </div>
+
+                        {/* Action buttons */}
+                        <div className="flex gap-2 flex-wrap">
+                          <button
+                            onClick={() => setShowPreview(p => ({ ...p, [meta.key]: !p[meta.key] }))}
+                            className={`px-3 py-2 text-sm font-semibold rounded-xl transition-colors border flex items-center gap-1.5 ${isPreviewOpen ? 'bg-green-50 border-green-200 text-green-700 dark:bg-green-950 dark:border-green-800 dark:text-green-400' : 'border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:border-slate-300'}`}
+                          >
+                            <Bell size={13} />
+                            {isPreviewOpen ? 'إخفاء المعاينة' : 'معاينة واتساب'}
+                          </button>
                           <button onClick={() => saveTemplate(meta.key)} disabled={!!saving[meta.key]}
-                            className={`flex-1 py-2 rounded-xl font-semibold text-sm transition-all ${saved[meta.key] ? 'bg-green-500 text-white' : 'bg-blue-600 hover:bg-blue-700 text-white'} disabled:opacity-50`}>
-                            {saving[meta.key] ? '...' : saved[meta.key] ? '✓ تم الحفظ' : 'حفظ القالب'}
+                            className={`flex-1 py-2 rounded-xl font-semibold text-sm transition-all flex items-center justify-center gap-1.5 ${saved[meta.key] ? 'bg-green-500 text-white' : 'bg-blue-600 hover:bg-blue-700 text-white'} disabled:opacity-50`}>
+                            <Save size={13} />
+                            {saving[meta.key] ? '...' : saved[meta.key] ? '✓ تم الحفظ' : 'حفظ'}
                           </button>
                           <button onClick={() => testEvent(meta.key)} disabled={!!testing[meta.key]}
-                            className="px-4 py-2 bg-slate-800 dark:bg-slate-700 hover:bg-slate-700 dark:hover:bg-slate-600 disabled:opacity-50 text-white rounded-xl text-sm transition-colors">
+                            className="px-4 py-2 bg-slate-800 dark:bg-slate-700 hover:bg-slate-700 dark:hover:bg-slate-600 disabled:opacity-50 text-white rounded-xl text-sm transition-colors flex items-center gap-1.5">
+                            <Play size={12} />
                             {testing[meta.key] ? '...' : 'اختبار'}
                           </button>
                         </div>
@@ -837,92 +916,6 @@ export default function AdminDashboard() {
                   }}
                 />
               </div>
-
-              {/* ── Automation CRUD ── */}
-              <div>
-                <div className="flex items-center justify-between mb-3">
-                  <div>
-                    <h3 className="font-bold text-slate-900 dark:text-white">قواعد الأتمتة (إذا / إذن)</h3>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">متى يُرسل الإشعار ولمن — يمكنك الإضافة والتعديل والحذف</p>
-                  </div>
-                  <button
-                    onClick={() => { setAddingRule(true); setEditingRuleId(null); }}
-                    className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl transition-colors"
-                  >
-                    <Plus size={14} strokeWidth={2.5} />
-                    إضافة
-                  </button>
-                </div>
-
-                <div className="space-y-2">
-                  {automations.map(rule => {
-                    const meta = EVENT_META.find(m => m.key === rule.trigger);
-                    const isEditing = editingRuleId === rule.id;
-                    return (
-                      <div key={rule.id} className={`bg-white dark:bg-slate-800 rounded-2xl border transition-all ${rule.enabled ? 'border-slate-200 dark:border-slate-700' : 'border-slate-100 dark:border-slate-800 opacity-60'}`}>
-                        {!isEditing ? (
-                          <div className="flex items-center gap-3 px-4 py-3">
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className="text-slate-600 dark:text-slate-300 flex-shrink-0">{meta?.icon ?? <Zap size={16} />}</span>
-                                <span className="px-1.5 py-0.5 bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-400 text-[10px] font-bold rounded uppercase tracking-wide">إذا</span>
-                                <span className="text-sm font-medium text-slate-900 dark:text-white truncate">{meta?.ifLabel || rule.trigger}</span>
-                              </div>
-                              <div className="flex items-center gap-2 mt-1 flex-wrap">
-                                <span className="px-1.5 py-0.5 bg-green-100 dark:bg-green-950 text-green-700 dark:text-green-400 text-[10px] font-bold rounded uppercase tracking-wide">إذن</span>
-                                <span className="text-xs text-slate-600 dark:text-slate-400">
-                                  أرسل واتساب → <span className="font-semibold">{RECIPIENT_LABELS[rule.recipientType]}</span>
-                                  {rule.customPhone && <span className="font-mono text-slate-500 ml-1" dir="ltr">{rule.customPhone}</span>}
-                                </span>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-2 flex-shrink-0">
-                              <Toggle
-                                checked={rule.enabled}
-                                onChange={v => patchRule(rule.id, { enabled: v })}
-                              />
-                              <button
-                                onClick={() => { setEditingRuleId(rule.id); setAddingRule(false); }}
-                                className="p-2 text-slate-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950 rounded-xl transition-colors"
-                              >
-                                <Pencil size={14} strokeWidth={2} />
-                              </button>
-                              <button
-                                onClick={() => deleteRule(rule.id)}
-                                className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950 rounded-xl transition-colors"
-                              >
-                                <Trash2 size={14} strokeWidth={1.5} />
-                              </button>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="p-3">
-                            <RuleForm
-                              initial={rule}
-                              onSave={data => saveEditRule(rule.id, data)}
-                              onCancel={() => setEditingRuleId(null)}
-                            />
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-
-                  {automations.length === 0 && (
-                    <p className="text-slate-400 dark:text-slate-500 text-sm text-center py-6">لا توجد قواعد بعد — أضف واحدة</p>
-                  )}
-                </div>
-
-                {addingRule && (
-                  <div className="mt-3">
-                    <RuleForm
-                      onSave={addRule}
-                      onCancel={() => setAddingRule(false)}
-                    />
-                  </div>
-                )}
-              </div>
-
 
               {/* App config */}
               <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-5">
