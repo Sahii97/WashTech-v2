@@ -53,7 +53,8 @@ export default function BookingPage() {
             set('neighborhood', match);
             setGpsDetected(true);
           } else if (detected) {
-            setGpsError(lang === 'ar' ? `لم يُطابق: ${detected} — اكتب المنطقة يدوياً` : `نەگنجا: ${detected} — دەستی بنووسە`);
+            set('neighborhood', detected);
+            setGpsDetected(true);
           } else {
             setGpsError(lang === 'ar' ? 'تعذّر تحديد المنطقة — اكتبها يدوياً' : 'ناوچەکە نەدۆزرایەوە — دەستی بنووسە');
           }
