@@ -8,8 +8,7 @@ type Booking = {
   captainShare?: number; companyShare?: number; price?: number;
 };
 type Driver = { id: string; name: string; code: string };
-type FinanceCaptain = { id: string; name: string; phone?: string; balance: number; totalEarned: number; totalWithdrawn: number };
-type Tab = 'pending' | 'active' | 'completed' | 'rejected' | 'finance';
+type Tab = 'pending' | 'active' | 'completed' | 'rejected';
 
 const STATUS_LABELS: Record<string, string> = {
   pending: 'انتظار', approved: 'مقبول', accepted: 'مقبول من الكابتن',
@@ -26,25 +25,16 @@ export default function ManagerDashboard() {
   const [selectedDrivers, setSelectedDrivers] = useState<Record<string, string>>({});
   const [loading,         setLoading]         = useState(false);
 
-  // Finance
-  const [finCaptains,  setFinCaptains]  = useState<FinanceCaptain[]>([]);
-  const [finOverview,  setFinOverview]  = useState<{ totalRevenue: number; companyRevenue: number; captainPayouts: number; completedCount: number } | null>(null);
-  const [finLoading,   setFinLoading]   = useState(false);
-  const [adjForm,      setAdjForm]      = useState<{ captainId: string; type: 'adjustment' | 'withdrawal'; amount: string; note: string }>({ captainId: '', type: 'adjustment', amount: '', note: '' });
-  const [adjMsg,       setAdjMsg]       = useState('');
-  const [adjLoading,   setAdjLoading]   = useState(false);
 
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     load();
-    loadFinance();
     intervalRef.current = setInterval(() => load(), 10000);
     return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
   }, []);
 
   useEffect(() => {
-    if (tab === 'finance') loadFinance();
   }, [tab]);
 
   async function load() {
@@ -57,21 +47,7 @@ export default function ManagerDashboard() {
     setLoading(false);
   }
 
-  async function loadFinance() {
-    setFinLoading(true);
-    try {
-      const [ov, ca] = await Promise.all([
-        fetch('/api/manager/finance/overview').then(r => r.json()),
-        fetch('/api/manager/finance/captains').then(r => r.json()),
-      ]);
-      setFinOverview(ov);
-      setFinCaptains(ca.captains || []);
-      if (ca.captains?.length && !adjForm.captainId) {
-        setAdjForm(p => ({ ...p, captainId: ca.captains[0].id }));
-      }
-    } catch {}
-    setFinLoading(false);
-  }
+
 
   async function action(bookingId: string, act: 'approve' | 'reject') {
     const driverId = selectedDrivers[bookingId] || drivers[0]?.id;
@@ -82,21 +58,6 @@ export default function ManagerDashboard() {
     load();
   }
 
-  async function submitAdjustment(e: React.FormEvent) {
-    e.preventDefault();
-    if (!adjForm.captainId || !adjForm.amount) return;
-    setAdjLoading(true); setAdjMsg('');
-    const res = await fetch('/api/captain/transaction', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ driverId: adjForm.captainId, type: adjForm.type, amount: Number(adjForm.amount), note: adjForm.note }),
-    });
-    const d = await res.json();
-    setAdjMsg(d.success ? '✓ تم تحديث المحفظة' : (d.error || 'خطأ'));
-    setAdjForm(p => ({ ...p, amount: '', note: '' }));
-    setAdjLoading(false);
-    loadFinance();
-    setTimeout(() => setAdjMsg(''), 3000);
-  }
 
   const bookingTabs = (['pending', 'active', 'completed', 'rejected'] as const);
 
@@ -115,7 +76,6 @@ export default function ManagerDashboard() {
   };
 
   const completedB = bookings.filter(b => ['completed', 'closed'].includes(b.status));
-  const totalRevenue   = completedB.reduce((s: number, b: any) => s + (b.financials?.totalAmount  || b.price || 0), 0);
   const companyRevenue = completedB.reduce((s: number, b: any) => s + (b.financials?.companyShare || b.companyShare || 0), 0);
 
   const BOOKING_TABS: { key: typeof bookingTabs[number]; label: string; color: string }[] = [
@@ -135,7 +95,7 @@ export default function ManagerDashboard() {
           <h1 className="text-xl font-bold text-slate-900 dark:text-white">لوحة المدير</h1>
           <p className="text-sm text-slate-500 dark:text-slate-400">{bookings.length} حجز إجمالي</p>
         </div>
-        <button onClick={() => { load(); loadFinance(); }} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors" title="تحديث">
+        <button onClick={() => { load(); }} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors" title="تحديث">
           <IcRefresh className={`w-5 h-5 text-slate-500 dark:text-slate-400 ${loading ? 'animate-spin' : ''}`} />
         </button>
       </header>
@@ -182,17 +142,6 @@ export default function ManagerDashboard() {
               <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{t.label}</div>
             </button>
           ))}
-          {/* Finance tab */}
-          <button
-            onClick={() => setTab('finance')}
-            className={`flex-shrink-0 flex items-center gap-2 bg-white dark:bg-slate-800 rounded-xl border px-4 py-2.5 text-center transition-all ${tab === 'finance' ? 'border-green-500 shadow-sm' : 'border-slate-200 dark:border-slate-700 hover:border-slate-300'}`}
-          >
-            <IcWallet className={`w-5 h-5 ${tab === 'finance' ? 'text-green-600' : 'text-slate-400'}`} />
-            <div>
-              <div className={`text-xl font-bold ${tab === 'finance' ? 'text-green-600' : 'text-slate-500'}`}>{finCaptains.length}</div>
-              <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">المالية</div>
-            </div>
-          </button>
         </div>
       </div>
 
@@ -303,7 +252,6 @@ export default function ManagerDashboard() {
       )}
 
       {/* ── Bookings Tab ─────────────────────────────────────────── */}
-      {tab !== 'finance' && (
         <div className="max-w-4xl mx-auto px-4 pb-10 space-y-3">
           {filtered.length === 0 && (
             <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-10 text-center text-slate-400 dark:text-slate-500">
@@ -329,11 +277,6 @@ export default function ManagerDashboard() {
                       {drivers.find(d => d.id === b.driverId)?.name || 'كابتن'}
                     </p>
                   )}
-                  {(() => { const amt = (b as any).financials?.totalAmount || b.price || 0; return amt > 0 ? (
-                    <p className="text-xs text-green-600 dark:text-green-400 mt-1 font-mono">
-                      {amt.toLocaleString()} IQD · كابتن {((b as any).financials?.captainShare || b.captainShare || 0).toLocaleString()} · شركة {((b as any).financials?.companyShare || b.companyShare || 0).toLocaleString()}
-                    </p>
-                  ) : null; })()}
                   <p className="text-xs text-slate-400 dark:text-slate-500 mt-1 font-mono">#{b.id.slice(-8)}</p>
                 </div>
 
@@ -362,7 +305,6 @@ export default function ManagerDashboard() {
             </div>
           ))}
         </div>
-      )}
     </div>
   );
 }

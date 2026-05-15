@@ -4,26 +4,19 @@ import { Car as IcCar, Phone as IcPhone, MapPin as IcMapPin, Clock as IcClock, C
 type Task = {
   id: string; name: string; phone: string; neighborhood: string;
   carType: string; package: string; date: string; slot: string; status: string;
-  financials?: { totalAmount: number; captainShare: number; companyShare: number };
 };
 type Captain = { id: string; name: string; code: string; phone?: string };
-type Wallet  = { balance: number; totalEarned: number; totalWithdrawn: number };
-type Tx      = { id: string; type: string; amount: number; note?: string; bookingId?: string; createdAt: string };
 
 export default function CaptainView() {
   const [allCaptains, setAllCaptains] = useState<Captain[]>([]);
   const [captain,     setCaptain]     = useState<Captain | null>(null);
   const [tasks,       setTasks]       = useState<Task[]>([]);
   const [recentDone,  setRecentDone]  = useState<Task[]>([]);
-  const [wallet,      setWallet]      = useState<Wallet | null>(null);
-  const [transactions,setTransactions]= useState<Tx[]>([]);
-  const [txLoading,   setTxLoading]   = useState(false);
   const [loading,     setLoading]     = useState(false);
   const [captainsLoading, setCaptainsLoading] = useState(true);
   const [confirmId,   setConfirmId]   = useState<string | null>(null);
-  const [tab,         setTab]         = useState<'active' | 'done' | 'wallet'>('active');
+  const [tab,         setTab]         = useState<'active' | 'done'>('active');
   const [actionError, setActionError] = useState<string | null>(null);
-  const [actualAmount, setActualAmount] = useState<string>('');
 
   useEffect(() => {
     fetch('/api/drivers')
@@ -40,7 +33,6 @@ export default function CaptainView() {
   async function selectCaptain(c: Captain) {
     setCaptain(c);
     loadTasks(c.id);
-    loadWallet(c.id);
   }
 
   async function loadTasks(captainId: string) {
@@ -55,27 +47,7 @@ export default function CaptainView() {
     setLoading(false);
   }
 
-  async function loadWallet(captainId: string) {
-    try {
-      const res = await fetch(`/api/captain/wallet?driverId=${captainId}`);
-      const data = await res.json();
-      if (data.wallet) setWallet(data.wallet);
-    } catch {}
-  }
 
-  async function loadTransactions(captainId: string) {
-    setTxLoading(true);
-    try {
-      const res = await fetch(`/api/captain/transactions?driverId=${captainId}&limit=30`);
-      const data = await res.json();
-      setTransactions(data.transactions || []);
-    } catch {}
-    setTxLoading(false);
-  }
-
-  useEffect(() => {
-    if (captain && tab === 'wallet') loadTransactions(captain.id);
-  }, [tab, captain]);
 
   async function acceptTask(taskId: string) {
     setActionError(null);
@@ -84,7 +56,7 @@ export default function CaptainView() {
       body: JSON.stringify({ bookingId: taskId, driverId: captain?.id }),
     });
     if (!res.ok) { const d = await res.json(); setActionError(d.error || 'خطأ'); return; }
-    if (captain) { loadTasks(captain.id); loadWallet(captain.id); }
+    if (captain) { loadTasks(captain.id); }
   }
 
   async function onRoad(taskId: string) {
@@ -98,20 +70,14 @@ export default function CaptainView() {
   }
 
   async function completeTask(taskId: string) {
-    if (!actualAmount) {
-      setActionError('يرجى إدخال المبلغ المستلم');
-      setConfirmId(null);
-      return;
-    }
     setConfirmId(null);
     setActionError(null);
     const res = await fetch('/api/driver/complete-task', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ bookingId: taskId, driverId: captain?.id, actualAmount: Number(actualAmount) }),
+      body: JSON.stringify({ bookingId: taskId, driverId: captain?.id }),
     });
     if (!res.ok) { const d = await res.json(); setActionError(d.error || 'خطأ'); return; }
-    if (captain) { loadTasks(captain.id); loadWallet(captain.id); }
-    setActualAmount('');
+    if (captain) { loadTasks(captain.id); }
   }
 
   // ── Captain picker ───────────────────────────────────────────
@@ -169,14 +135,7 @@ export default function CaptainView() {
           <p className="text-sm text-slate-500 dark:text-slate-400">{tasks.length} مهمة نشطة</p>
         </div>
         <div className="flex items-center gap-2">
-          {wallet !== null && (
-            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-green-50 dark:bg-green-950 rounded-xl border border-green-200 dark:border-green-800">
-              <IcWallet className="w-4 h-4 text-green-600" />
-              <span className="text-sm font-bold text-green-700 dark:text-green-400" dir="ltr">
-                {wallet.balance.toLocaleString()} IQD
-              </span>
-            </div>
-          )}
+
           <button
             onClick={() => loadTasks(captain.id)}
             className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors"
@@ -185,7 +144,7 @@ export default function CaptainView() {
             <IcRefresh className={`w-5 h-5 text-slate-500 dark:text-slate-400 ${loading ? 'animate-spin' : ''}`} />
           </button>
           <button
-            onClick={() => { setCaptain(null); setTasks([]); setWallet(null); setRecentDone([]); }}
+            onClick={() => { setCaptain(null); setTasks([]); setRecentDone([]); }}
             className="px-3 py-2 text-sm text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors"
           >
             تغيير
@@ -195,7 +154,7 @@ export default function CaptainView() {
 
       {/* Tabs: active / done / wallet */}
       <div className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 flex px-4 gap-1">
-        {([['active','المهام النشطة'],['done','المكتملة'],['wallet','المحفظة']] as const).map(([k, l]) => (
+        {([['active','المهام النشطة'],['done','المكتملة']] as const).map(([k, l]) => (
           <button
             key={k}
             onClick={() => setTab(k)}
@@ -204,7 +163,6 @@ export default function CaptainView() {
             }`}
           >
             {k === 'done' && <IcHistory className="w-4 h-4" />}
-            {k === 'wallet' && <IcWallet className="w-4 h-4" />}
             {l}
           </button>
         ))}
@@ -257,7 +215,7 @@ export default function CaptainView() {
               </button>
             )}
             {task.status === 'on_road' && (
-              <button onClick={() => { setConfirmId(task.id); setActualAmount(''); }}
+              <button onClick={() => { setConfirmId(task.id); }}
                 className="w-full py-2.5 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-xl transition-colors text-sm flex items-center justify-center gap-2">
                 <IcCheck className="w-4 h-4" /> تم الانتهاء
               </button>
@@ -279,60 +237,9 @@ export default function CaptainView() {
               <StatusBadge status={task.status} />
             </div>
             <p className="text-sm text-slate-500 dark:text-slate-400">{task.neighborhood} · {task.slot}</p>
-            {task.financials && (
-              <p className="text-sm font-bold text-green-600 dark:text-green-400 mt-1.5">
-                +{task.financials.captainShare.toLocaleString()} IQD
-              </p>
-            )}
           </div>
         ))}
-        {/* Wallet tab */}
-        {tab === 'wallet' && wallet && (
-          <div className="space-y-3">
-            {/* Summary cards */}
-            <div className="grid grid-cols-3 gap-2">
-              {[
-                { label: 'إجمالي المبالغ المستلمة', val: wallet.totalCollected || 0, cls: 'text-green-600' },
-                { label: 'إجمالي المكتسب', val: wallet.totalEarned || 0, cls: 'text-blue-600' },
-                { label: 'المطلوب سداده للشركة', val: (wallet.balance || 0) < 0 ? Math.abs(wallet.balance) : 0, cls: 'text-red-500' },
-              ].map(s => (
-                <div key={s.label} className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-4 text-center">
-                  <p className={`text-lg font-bold ${s.cls}`} dir="ltr">{s.val.toLocaleString()}</p>
-                  <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">{s.label}</p>
-                </div>
-              ))}
-            </div>
 
-            {/* Transaction history */}
-            <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden">
-              <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-700">
-                <p className="font-bold text-slate-900 dark:text-white text-sm">سجل المعاملات</p>
-              </div>
-              {txLoading && <div className="text-center py-8"><div className="w-6 h-6 border-2 border-brand-600 border-t-transparent rounded-full animate-spin mx-auto" /></div>}
-              {!txLoading && transactions.length === 0 && <p className="text-slate-400 text-sm text-center py-8">لا توجد معاملات بعد</p>}
-              {!txLoading && transactions.map(tx => (
-                <div key={tx.id} className="flex items-center justify-between px-4 py-3 border-b border-slate-50 dark:border-slate-700 last:border-0">
-                  <div>
-                    <p className="text-sm font-medium text-slate-900 dark:text-white">
-                      {tx.type === 'earning' ? 'أرباح' : tx.type === 'withdrawal' ? 'سحب' : tx.type === 'receipt' ? 'تسديد للشركة' : 'تسوية'}
-                      {tx.note ? ` — ${tx.note}` : ''}
-                    </p>
-                    <p className="text-xs text-slate-400 font-mono">{new Date(tx.createdAt).toLocaleDateString('ar-IQ')}</p>
-                  </div>
-                  <p className={`text-sm font-bold ${tx.type === 'withdrawal' ? 'text-red-500' : tx.type === 'receipt' ? 'text-blue-500' : 'text-green-600'}`} dir="ltr">
-                    {tx.type === 'withdrawal' || tx.type === 'receipt' ? '-' : '+'}{Math.abs(tx.amount).toLocaleString()} IQD
-                  </p>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-        {tab === 'wallet' && !wallet && !loading && (
-          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-10 text-center text-slate-400">
-            <IcWallet className="w-10 h-10 mx-auto mb-3 text-slate-300" />
-            <p>لم يتم تحميل بيانات المحفظة</p>
-          </div>
-        )}
       </div>
 
       {/* Confirm overlay */}
@@ -341,11 +248,10 @@ export default function CaptainView() {
           onClick={() => setConfirmId(null)}>
           <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 w-full max-w-sm" onClick={e => e.stopPropagation()}>
             <h2 className="font-bold text-slate-900 dark:text-white text-lg mb-2">تأكيد إتمام الخدمة</h2>
-            <p className="text-slate-500 dark:text-slate-400 text-sm mb-4">أدخل المبلغ الإجمالي الذي استلمته من العميل:</p>
-            <input type="number" dir="ltr" placeholder="المبلغ (د.ع)" value={actualAmount} onChange={e => setActualAmount(e.target.value)} className="w-full px-4 py-3 mb-5 border border-slate-300 dark:border-slate-600 rounded-xl text-center text-lg font-bold bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white" />
+            <p className="text-slate-500 dark:text-slate-400 text-sm mb-6">هل أنت متأكد من إتمام هذه المهمة؟</p>
             <div className="flex gap-3">
-              <button onClick={() => completeTask(confirmId)} disabled={!actualAmount}
-                className="flex-1 py-3 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white font-bold rounded-xl transition-colors">
+              <button onClick={() => completeTask(confirmId)}
+                className="flex-1 py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl transition-colors">
                 تأكيد الإتمام
               </button>
               <button onClick={() => setConfirmId(null)}
