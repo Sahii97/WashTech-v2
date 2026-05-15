@@ -77,7 +77,7 @@ export default function CaptainView() {
       body: JSON.stringify({ bookingId: taskId, driverId: captain?.id }),
     });
     if (!res.ok) { const d = await res.json(); setActionError(d.error || 'خطأ'); return; }
-    if (captain) { loadTasks(captain.id); }
+    if (captain) { loadTasks(captain.id); setTab('done'); }
   }
 
   // ── Captain picker ───────────────────────────────────────────
@@ -204,20 +204,20 @@ export default function CaptainView() {
 
             {task.status === 'approved' && (
               <button onClick={() => acceptTask(task.id)}
-                className="w-full py-2.5 bg-brand-600 hover:bg-brand-700 text-white font-semibold rounded-xl transition-colors text-sm flex items-center justify-center gap-2">
+                className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl transition-colors text-sm flex items-center justify-center gap-2">
                 <IcPlay className="w-4 h-4" /> قبول المهمة
               </button>
             )}
             {(task.status === 'accepted' || task.status === 'on_process') && (
               <button onClick={() => onRoad(task.id)}
-                className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl transition-colors text-sm flex items-center justify-center gap-2">
+                className="w-full py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-semibold rounded-xl transition-colors text-sm flex items-center justify-center gap-2">
                 <IcNav className="w-4 h-4" /> أنا في الطريق
               </button>
             )}
             {task.status === 'on_road' && (
               <button onClick={() => { setConfirmId(task.id); }}
                 className="w-full py-2.5 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-xl transition-colors text-sm flex items-center justify-center gap-2">
-                <IcCheck className="w-4 h-4" /> تم الانتهاء
+                <IcCheck className="w-4 h-4" /> تم الانتهاء ✓
               </button>
             )}
           </div>

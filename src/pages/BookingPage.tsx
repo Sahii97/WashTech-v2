@@ -93,23 +93,57 @@ export default function BookingPage() {
   }
 
   if (status === 'success') {
+    const carLabel = (tr.carTypes as Record<string,string>)[form.carType] || form.carType;
+    const pkgLabel = (tr.packages as Record<string,string>)[form.package] || form.package;
+    const dateLabel = form.date === 'today' ? tr.today : tr.tomorrow;
     return (
       <div dir={tr.dir} className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-4">
-        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-8 max-w-md w-full text-center">
-          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg className="w-8 h-8 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-            </svg>
+        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-8 max-w-md w-full">
+          <div className="text-center mb-6">
+            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg className="w-8 h-8 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-1">{tr.success}</h2>
+            <p className="text-slate-500 dark:text-slate-400 text-sm">{tr.successMsg}</p>
           </div>
-          <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">{tr.success}</h2>
-          <p className="text-slate-500 dark:text-slate-400 mb-6">{tr.successMsg}</p>
 
-          <button
-            onClick={() => { setStatus('idle'); setStep(1); setForm({ name:'',phone:'',neighborhood:'',carType:'',package:'',date:'today',slot:'' }); }}
-            className="w-full py-3 bg-brand-600 hover:bg-brand-700 text-white font-semibold rounded-xl transition-colors"
-          >
-            {tr.newBooking}
-          </button>
+          <div className="bg-slate-50 dark:bg-slate-700 rounded-xl p-4 space-y-2.5 mb-5 text-sm">
+            <div className="flex justify-between">
+              <span className="text-slate-500 dark:text-slate-400">{tr.name}</span>
+              <span className="font-semibold text-slate-900 dark:text-white">{form.name}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-slate-500 dark:text-slate-400">{tr.phone}</span>
+              <span className="font-semibold text-slate-900 dark:text-white" dir="ltr">{form.phone}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-slate-500 dark:text-slate-400">{tr.neighborhood}</span>
+              <span className="font-semibold text-slate-900 dark:text-white">{form.neighborhood}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-slate-500 dark:text-slate-400">{tr.carType}</span>
+              <span className="font-semibold text-slate-900 dark:text-white">{carLabel}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-slate-500 dark:text-slate-400">{tr.package}</span>
+              <span className="font-semibold text-slate-900 dark:text-white">{pkgLabel}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-slate-500 dark:text-slate-400">{tr.date}</span>
+              <span className="font-semibold text-slate-900 dark:text-white">{dateLabel} — {form.slot}</span>
+            </div>
+          </div>
+
+          <div className="flex items-start gap-3 bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-xl p-4">
+            <svg className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+            </svg>
+            <p className="text-sm text-green-800 dark:text-green-300">
+              {lang === 'ar' ? 'ستصلك رسالة واتساب بتأكيد الحجز وتحديثاته. شكراً لاختيارك WashTech!' : 'پەیامی واتساپت دەگات بە تازەکارییەکان. سوپاس بۆ هەڵبژاردنت WashTech!'}
+            </p>
+          </div>
         </div>
       </div>
     );
@@ -176,52 +210,30 @@ export default function BookingPage() {
           {step === 2 && (
             <div className="space-y-4">
               <Field label={tr.neighborhood}>
-                {gpsDetected ? (
-                  <div className="flex items-center justify-between bg-green-50 dark:bg-green-950 border-2 border-green-400 rounded-xl px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <svg className="w-4 h-4 text-green-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                      <span className="text-sm font-semibold text-green-800 dark:text-green-300">{form.neighborhood}</span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => { setGpsDetected(false); setGpsError(''); set('neighborhood', ''); }}
-                      className="text-xs text-green-600 dark:text-green-400 hover:text-green-800 underline"
-                    >
-                      {lang === 'ar' ? 'تغيير' : 'گۆڕین'}
-                    </button>
-                  </div>
-                ) : (
-                  <>
-                    {!gpsError && (
-                      <button
-                        type="button"
-                        onClick={detectLocation}
-                        disabled={gpsLoading}
-                        className="w-full flex items-center justify-center gap-2 px-3 py-2.5 mb-2 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 disabled:opacity-50 text-slate-700 dark:text-slate-200 text-sm font-medium rounded-xl transition-colors"
-                      >
-                        {gpsLoading ? (
-                          <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-                        ) : (
-                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                        )}
-                        {gpsLoading
-                          ? (lang === 'ar' ? 'جاري التحديد...' : 'دیاریکردن...')
-                          : (lang === 'ar' ? 'تحديد موقعي تلقائياً' : 'شوێنم ئۆتۆماتیکی دیاریبکە')}
-                      </button>
-                    )}
-                    {gpsError && (
-                      <div className="mb-2">
-                        <p className="text-xs text-amber-600 mb-2">{gpsError}</p>
-                        <input
-                          className={input}
-                          placeholder={lang === 'ar' ? 'اكتب اسم المنطقة...' : 'ناوی ناوچەکە بنووسە...'}
-                          value={form.neighborhood}
-                          onChange={e => set('neighborhood', e.target.value)}
-                        />
-                      </div>
-                    )}
-                  </>
-                )}
+                <button
+                  type="button"
+                  onClick={detectLocation}
+                  disabled={gpsLoading}
+                  className={`w-full flex items-center justify-center gap-2 px-3 py-2.5 mb-2 disabled:opacity-50 text-sm font-medium rounded-xl transition-colors ${gpsDetected ? 'bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-800' : 'bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200'}`}
+                >
+                  {gpsLoading ? (
+                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                  ) : (
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                  )}
+                  {gpsLoading
+                    ? (lang === 'ar' ? 'جاري التحديد...' : 'دیاریکردن...')
+                    : gpsDetected
+                      ? (lang === 'ar' ? `✓ تم تحديد الموقع` : `✓ شوێن دیارکرا`)
+                      : (lang === 'ar' ? 'تحديد موقعي تلقائياً' : 'شوێنم ئۆتۆماتیکی دیاریبکە')}
+                </button>
+                {gpsError && <p className="text-xs text-amber-600 mb-2">{gpsError}</p>}
+                <input
+                  className={input}
+                  placeholder={lang === 'ar' ? 'اكتب اسم المنطقة...' : 'ناوی ناوچەکە بنووسە...'}
+                  value={form.neighborhood}
+                  onChange={e => { set('neighborhood', e.target.value); setGpsDetected(false); }}
+                />
               </Field>
               <Field label={tr.carType}>
                 <div className="grid grid-cols-2 gap-2">

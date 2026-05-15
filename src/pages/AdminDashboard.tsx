@@ -83,13 +83,14 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean
     <button
       type="button"
       role="switch"
+      dir="ltr"
       aria-checked={checked}
       onClick={() => onChange(!checked)}
-      className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${checked ? 'bg-green-500' : 'bg-slate-200 dark:bg-slate-600'}`}
+      className={`relative inline-flex h-7 w-12 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${checked ? 'bg-green-500' : 'bg-slate-300 dark:bg-slate-600'}`}
     >
       <span
-        style={{ transform: checked ? 'translateX(20px)' : 'translateX(1px)', marginTop: '1px' }}
-        className="inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform duration-200 ease-in-out"
+        style={{ transform: checked ? 'translateX(20px)' : 'translateX(2px)', marginTop: '1px' }}
+        className="inline-block h-5 w-5 rounded-full bg-white shadow transition-transform duration-200 ease-in-out"
       />
     </button>
   );
@@ -575,33 +576,6 @@ export default function AdminDashboard() {
           {section === 'workflow' && (
             <div className="space-y-4">
               <h2 className="font-bold text-slate-900 dark:text-white text-lg">قوالب الرسائل</h2>
-
-              <div className="bg-slate-900 dark:bg-slate-800 rounded-2xl p-4 space-y-3 border border-slate-700">
-                <p className="text-white font-semibold text-sm">اختبار الإرسال — {EVENT_META.length} رسائل</p>
-                <input type="tel" dir="ltr" placeholder="07XXXXXXXXX" value={testPhone}
-                  onChange={e => setTestPhone(e.target.value)}
-                  className="w-full bg-white/10 text-white placeholder-white/40 border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-white/20" />
-                <button onClick={testAll} disabled={testingAll}
-                  className="w-full py-2.5 bg-green-600 hover:bg-green-500 disabled:opacity-50 text-white font-bold rounded-xl text-sm transition-colors flex items-center justify-center gap-2">
-                  <Send size={16} strokeWidth={1.5} />
-                  {testingAll ? 'جاري الإرسال...' : `إرسال دورة كاملة — ${EVENT_META.length} رسائل`}
-                </button>
-                {testAllResult && (
-                  <p className={`text-xs text-center font-mono ${testAllResult.startsWith('✓') ? 'text-green-400' : 'text-red-400'}`}>
-                    {testAllResult}
-                  </p>
-                )}
-                {testAllRows.length > 0 && (
-                  <div className="space-y-1 pt-1 border-t border-white/10">
-                    {testAllRows.map((r, i) => (
-                      <div key={i} className="flex items-center gap-2 text-xs">
-                        <span className={r.ok ? 'text-green-400' : 'text-red-400'}>{r.ok ? '✓' : '✗'}</span>
-                        <span className={r.ok ? 'text-white/70' : 'text-red-400'}>{r.label}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
 
               {EVENT_META.map(meta => {
                 const cfg = templates[meta.key] || DEFAULT_TEMPLATES[meta.key];
