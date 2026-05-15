@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { LayoutGrid, Bell, Car, Users, MapPin, Play, Trash2, Plus, Check, RefreshCw, Moon, Sun, Send, TrendingUp, Pencil, X, ChevronDown, Terminal, Wallet, DollarSign, ArrowDownLeft, ArrowUpRight, Save, Package, CheckCheck, XCircle, Navigation, Star, Smartphone, Zap } from 'lucide-react';
 import MessageCard from '../components/MessageCard';
+import WashTechLogo from '../components/WashTechLogo';
 
 function timeAgo(iso: string): string {
   const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
@@ -520,15 +521,10 @@ export default function AdminDashboard() {
       {/* Header */}
       <header className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 px-6 py-4 flex items-center justify-between sticky top-0 z-10">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-            <Car size={16} className="text-white" strokeWidth={2} />
-          </div>
-          <div>
-            <h1 className="font-bold text-slate-900 dark:text-white leading-none">واش تك — الإدارة</h1>
-            <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
-              #{BUILD_COUNT} · {timeAgo(BUILD_TIME)} · {bookings.length} حجز · {drivers.length} كابتن
-            </p>
-          </div>
+          <WashTechLogo size={32} />
+          <p className="text-xs text-slate-400 dark:text-slate-500">
+            #{BUILD_COUNT} · {timeAgo(BUILD_TIME)} · {bookings.length} حجز · {drivers.length} كابتن
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <button onClick={() => setDark(d => !d)}

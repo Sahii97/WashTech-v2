@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Check as IcCheck, X as IcX, RefreshCw as IcRefresh, ChevronDown, Banknote as IcDollar, User as IcUser, Wallet as IcWallet, TrendingUp, ArrowUpRight, ArrowDownLeft } from 'lucide-react';
+import WashTechLogo from '../components/WashTechLogo';
 
 type Booking = {
   id: string; name: string; phone: string; neighborhood: string;
@@ -99,8 +100,8 @@ export default function ManagerDashboard() {
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950" dir="rtl">
       {/* Header */}
       <header className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 px-6 py-4 flex items-center justify-between sticky top-0 z-10">
-        <div>
-          <h1 className="text-xl font-bold text-slate-900 dark:text-white">لوحة المدير</h1>
+        <div className="flex flex-col gap-0.5">
+          <WashTechLogo size={28} />
           <p className="text-sm text-slate-500 dark:text-slate-400">{bookings.length} حجز إجمالي</p>
         </div>
         <button onClick={() => { load(); }} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors" title="تحديث">

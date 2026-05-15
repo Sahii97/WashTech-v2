@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { t, Lang } from '../translations';
 import SearchableDropdown from '../components/SearchableDropdown';
+import WashTechLogo from '../components/WashTechLogo';
 
 type Step = 1 | 2 | 3;
 type Status = 'idle' | 'submitting' | 'success' | 'error';
@@ -154,10 +155,7 @@ export default function BookingPage() {
       {/* Header */}
       <header className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 px-4 py-4">
         <div className="max-w-lg mx-auto flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-bold text-slate-900 dark:text-white">{tr.appName}</h1>
-            <p className="text-sm text-slate-500 dark:text-slate-400">{tr.tagline}</p>
-          </div>
+          <WashTechLogo size={36} />
           <div className="flex gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
             {(['ar','ku'] as Lang[]).map(l => (
               <button
@@ -284,18 +282,16 @@ export default function BookingPage() {
                 </div>
               </Field>
               <Field label={tr.timeSlot}>
-                <div className="grid grid-cols-3 gap-2">
+                <select
+                  value={form.slot}
+                  onChange={e => set('slot', e.target.value)}
+                  className={input + ' cursor-pointer'}
+                >
+                  <option value="">{lang === 'ar' ? '— اختر الوقت —' : '— کاتەکە هەڵبژێرە —'}</option>
                   {(slots.length ? slots : tr.slots).map(s => (
-                    <button
-                      key={s}
-                      type="button"
-                      onClick={() => set('slot', s)}
-                      className={`p-2 rounded-xl border-2 text-xs font-medium transition-all ${form.slot === s ? 'border-brand-600 bg-brand-50 text-brand-700' : 'border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-200 hover:border-slate-300 dark:hover:border-slate-500'}`}
-                    >
-                      {s}
-                    </button>
+                    <option key={s} value={s}>{s}</option>
                   ))}
-                </div>
+                </select>
               </Field>
             </div>
           )}

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Car as IcCar, Phone as IcPhone, MapPin as IcMapPin, Clock as IcClock, Check as IcCheck, Play as IcPlay, RefreshCw as IcRefresh, Navigation as IcNav, Wallet as IcWallet, History as IcHistory } from 'lucide-react';
+import WashTechLogo from '../components/WashTechLogo';
 
 type Task = {
   id: string; name: string; phone: string; neighborhood: string;
@@ -147,9 +148,9 @@ export default function CaptainView() {
     <div dir="rtl" className="min-h-[100dvh] bg-slate-50 dark:bg-slate-950 flex flex-col">
       {/* Header */}
       <header className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 px-6 py-4 flex items-center justify-between sticky top-0 z-10">
-        <div>
-          <h1 className="text-xl font-bold text-slate-900 dark:text-white">مرحباً، {captain.name}</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400">{tasks.length} مهمة نشطة</p>
+        <div className="flex flex-col gap-0.5">
+          <WashTechLogo size={28} />
+          <p className="text-sm text-slate-500 dark:text-slate-400">مرحباً، {captain.name} · {tasks.length} مهمة نشطة</p>
         </div>
         <div className="flex items-center gap-2">
 
