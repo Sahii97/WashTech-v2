@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { t, Lang } from '../translations';
-import { Search as IcSearch, ChevronDown as IcChevronDown } from 'lucide-react';
 import SearchableDropdown from '../components/SearchableDropdown';
 
 type Step = 1 | 2 | 3;
@@ -20,7 +19,6 @@ export default function BookingPage() {
 
   const [gpsLoading, setGpsLoading] = useState(false);
   const [gpsError, setGpsError] = useState('');
-  const [trackOpen, setTrackOpen] = useState(false);
 
   const [form, setForm] = useState({
     name: '', phone: '', neighborhood: '',
@@ -103,34 +101,8 @@ export default function BookingPage() {
           <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">{tr.success}</h2>
           <p className="text-slate-500 dark:text-slate-400 mb-6">{tr.successMsg}</p>
 
-          {/* Collapsible track bar */}
-          <div className="mb-4 border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden text-start">
-            <button
-              onClick={() => setTrackOpen(o => !o)}
-              className="w-full flex items-center justify-between px-4 py-3 bg-slate-50 dark:bg-slate-700 hover:bg-slate-100 dark:hover:bg-slate-600 transition-colors"
-            >
-              <span className="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
-                <IcSearch className="w-4 h-4 text-slate-400 dark:text-slate-500" />
-                {lang === 'ar' ? 'تتبع طلبي' : 'ئۆردەرم بشوێندەبکەوە'}
-              </span>
-              <IcChevronDown className={`w-4 h-4 text-slate-400 dark:text-slate-500 transition-transform ${trackOpen ? 'rotate-180' : ''}`} />
-            </button>
-            {trackOpen && (
-              <div className="px-4 py-3 bg-white dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700">
-                <p className="text-xs text-slate-400 dark:text-slate-500 mb-1">{tr.bookingId}</p>
-                <p className="font-mono text-xs font-semibold text-slate-800 dark:text-slate-200 break-all mb-3">{bookingId}</p>
-                <a
-                  href={`/track?phone=${encodeURIComponent(form.phone)}`}
-                  className="block w-full py-2 bg-slate-900 dark:bg-slate-700 hover:bg-slate-700 dark:hover:bg-slate-600 text-white text-sm font-semibold rounded-xl text-center transition-colors"
-                >
-                  {lang === 'ar' ? 'تتبع باستخدام رقم الهاتف' : 'بە ژمارەی تەلەفۆن شوێندەکەوە'}
-                </a>
-              </div>
-            )}
-          </div>
-
           <button
-            onClick={() => { setStatus('idle'); setStep(1); setTrackOpen(false); setForm({ name:'',phone:'',neighborhood:'',carType:'',package:'',date:'today',slot:'' }); }}
+            onClick={() => { setStatus('idle'); setStep(1); setForm({ name:'',phone:'',neighborhood:'',carType:'',package:'',date:'today',slot:'' }); }}
             className="w-full py-3 bg-brand-600 hover:bg-brand-700 text-white font-semibold rounded-xl transition-colors"
           >
             {tr.newBooking}

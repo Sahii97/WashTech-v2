@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { LayoutGrid, Bell, Car, Users, MapPin, Play, Trash2, Plus, Check, RefreshCw, Moon, Sun, Send, TrendingUp, Pencil, X, ChevronDown, Terminal, Wallet, DollarSign, ArrowDownLeft, ArrowUpRight, Save } from 'lucide-react';
+import { LayoutGrid, Bell, Car, Users, MapPin, Play, Trash2, Plus, Check, RefreshCw, Moon, Sun, Send, TrendingUp, Pencil, X, ChevronDown, Terminal, Wallet, DollarSign, ArrowDownLeft, ArrowUpRight, Save, Package, CheckCheck, XCircle, Navigation, Star, Smartphone, Zap } from 'lucide-react';
 import MessageCard from '../components/MessageCard';
 
 function timeAgo(iso: string): string {
@@ -52,13 +52,13 @@ const DEFAULT_TEMPLATES: Templates = {
   booking_completed: { enabled: true, template: '✅ تم الانتهاء من خدمة غسيل سيارتك!\nشكراً لاختيارك WashTech 🧼\nقيّم تجربتك: ⭐⭐⭐⭐⭐' },
 };
 
-const EVENT_META: { key: EventKey; icon: string; label: string; ifLabel: string; vars: string[]; recipient: string }[] = [
-  { key: 'new_booking',       icon: '📦', label: 'حجز جديد',         ifLabel: 'وصل حجز جديد',             recipient: 'يُرسل إلى: المدير',   vars: ['id','name','phone','neighborhood','carType','package','date','slot','approveLink','rejectLink'] },
-  { key: 'booking_approved',  icon: '✅', label: 'موافقة المدير',     ifLabel: 'وافق المدير على الحجز',    recipient: 'يُرسل إلى: الكابتن', vars: ['name','phone','neighborhood','slot','driverName','driverPhone','acceptLink'] },
-  { key: 'driver_accepted',   icon: '🚗', label: 'قبول الكابتن',     ifLabel: 'قبل الكابتن المهمة',        recipient: 'يُرسل إلى: العميل',  vars: ['name','phone','driverName','slot'] },
-  { key: 'booking_rejected',  icon: '❌', label: 'رفض الحجز',        ifLabel: 'رُفض الحجز',               recipient: 'يُرسل إلى: العميل',  vars: ['name','phone'] },
-  { key: 'captain_on_road',   icon: '🚀', label: 'الكابتن في الطريق', ifLabel: 'انطلق الكابتن للعميل',     recipient: 'يُرسل إلى: العميل',  vars: ['name','phone','driverName','slot'] },
-  { key: 'booking_completed', icon: '✨', label: 'اكتمال الخدمة',    ifLabel: 'اكتملت الخدمة',            recipient: 'يُرسل إلى: العميل',  vars: ['name','phone'] },
+const EVENT_META: { key: EventKey; icon: React.ReactNode; label: string; ifLabel: string; vars: string[]; recipient: string }[] = [
+  { key: 'new_booking',       icon: <Package size={18} strokeWidth={1.5} />,   label: 'حجز جديد',          ifLabel: 'وصل حجز جديد',             recipient: 'يُرسل إلى: المدير',   vars: ['id','name','phone','neighborhood','carType','package','date','slot','approveLink','rejectLink'] },
+  { key: 'booking_approved',  icon: <CheckCheck size={18} strokeWidth={1.5} />, label: 'موافقة المدير',    ifLabel: 'وافق المدير على الحجز',    recipient: 'يُرسل إلى: الكابتن', vars: ['name','phone','neighborhood','slot','driverName','driverPhone','acceptLink'] },
+  { key: 'driver_accepted',   icon: <Car size={18} strokeWidth={1.5} />,        label: 'قبول الكابتن',    ifLabel: 'قبل الكابتن المهمة',        recipient: 'يُرسل إلى: العميل',  vars: ['name','phone','driverName','slot'] },
+  { key: 'booking_rejected',  icon: <XCircle size={18} strokeWidth={1.5} />,    label: 'رفض الحجز',       ifLabel: 'رُفض الحجز',               recipient: 'يُرسل إلى: العميل',  vars: ['name','phone'] },
+  { key: 'captain_on_road',   icon: <Navigation size={18} strokeWidth={1.5} />, label: 'الكابتن في الطريق', ifLabel: 'انطلق الكابتن للعميل',   recipient: 'يُرسل إلى: العميل',  vars: ['name','phone','driverName','slot'] },
+  { key: 'booking_completed', icon: <Star size={18} strokeWidth={1.5} />,       label: 'اكتمال الخدمة',   ifLabel: 'اكتملت الخدمة',            recipient: 'يُرسل إلى: العميل',  vars: ['name','phone'] },
 ];
 
 const RECIPIENT_LABELS: Record<RecipientType, string> = {
@@ -164,7 +164,7 @@ function RuleForm({
             className={inp + ' appearance-none pr-8'}
           >
             {EVENT_META.map(m => (
-              <option key={m.key} value={m.key}>{m.icon} {m.ifLabel}</option>
+              <option key={m.key} value={m.key}>{m.ifLabel}</option>
             ))}
           </select>
           <ChevronDown size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
@@ -247,8 +247,8 @@ export default function AdminDashboard() {
 
 
   // Dynamic settings state
-  const [finConfig,      setFinConfig]      = useState({ captainSharePct: 70, basic: 15000, standard: 25000, premium: 35000 });
-  const [appConfig,      setAppConfig]      = useState({ appName: 'WashTech', tagline: 'خدمة غسيل سيارات احترافية', supportPhone: '' });
+  const [finConfig,      setFinConfig]      = useState({ captainSharePct: 70, basic: 15000, standard: 25000, premium: 35000, basicName: 'أساسي', standardName: 'قياسي', premiumName: 'ممتاز', basicDesc: '', standardDesc: '', premiumDesc: '' });
+  const [appConfig,      setAppConfig]      = useState({ appName: 'WashTech', tagline: 'خدمة غسيل سيارات احترافية', supportPhone: '', managerPhone: '', automationEnabled: true });
   const [settingsSaved,  setSettingsSaved]  = useState('');
   const [settingsLoading,setSettingsLoading]= useState(false);
 
@@ -308,7 +308,12 @@ export default function AdminDashboard() {
       ]);
       if (fc?.value) {
         const v = fc.value;
-        setFinConfig({ captainSharePct: Math.round((v.captainSharePct || 0.70) * 100), basic: v.packagePrices?.basic || 15000, standard: v.packagePrices?.standard || 25000, premium: v.packagePrices?.premium || 35000 });
+        setFinConfig({
+          captainSharePct: Math.round((v.captainSharePct || 0.70) * 100),
+          basic: v.packagePrices?.basic || 15000, standard: v.packagePrices?.standard || 25000, premium: v.packagePrices?.premium || 35000,
+          basicName: v.packageNames?.basic || 'أساسي', standardName: v.packageNames?.standard || 'قياسي', premiumName: v.packageNames?.premium || 'ممتاز',
+          basicDesc: v.packageDescriptions?.basic || '', standardDesc: v.packageDescriptions?.standard || '', premiumDesc: v.packageDescriptions?.premium || '',
+        });
       }
       if (ac?.value) setAppConfig(prev => ({ ...prev, ...ac.value }));
     } catch {}
@@ -352,7 +357,12 @@ export default function AdminDashboard() {
 
   async function saveFinanceConfig() {
     setSettingsLoading(true);
-    const value = { captainSharePct: finConfig.captainSharePct / 100, packagePrices: { basic: finConfig.basic, standard: finConfig.standard, premium: finConfig.premium } };
+    const value = {
+      captainSharePct: finConfig.captainSharePct / 100,
+      packagePrices: { basic: finConfig.basic, standard: finConfig.standard, premium: finConfig.premium },
+      packageNames: { basic: finConfig.basicName, standard: finConfig.standardName, premium: finConfig.premiumName },
+      packageDescriptions: { basic: finConfig.basicDesc, standard: finConfig.standardDesc, premium: finConfig.premiumDesc },
+    };
     await fetch('/api/admin/settings/finance_config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ value }) });
     setSettingsSaved('finance'); setSettingsLoading(false);
     setTimeout(() => setSettingsSaved(''), 2500);
@@ -660,7 +670,7 @@ export default function AdminDashboard() {
                     <div className="flex items-start justify-between mb-3 gap-2">
                       <div>
                         <div className="flex items-center gap-2">
-                          <span className="text-lg">{meta.icon}</span>
+                          <span className="text-slate-600 dark:text-slate-300">{meta.icon}</span>
                           <p className="font-semibold text-slate-900 dark:text-white text-sm">{meta.label}</p>
                         </div>
                         <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5 mr-7">{meta.recipient}</p>
@@ -925,6 +935,25 @@ export default function AdminDashboard() {
                 <h2 className="font-bold text-slate-900 dark:text-white text-lg">اعدادات المطور</h2>
               </div>
 
+              {/* ── Global automation toggle ── */}
+              <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Zap size={20} className={appConfig.automationEnabled !== false ? 'text-green-500' : 'text-slate-400'} strokeWidth={1.5} />
+                  <div>
+                    <p className="font-semibold text-slate-900 dark:text-white text-sm">إشعارات واتساب</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{appConfig.automationEnabled !== false ? 'مفعّلة — الرسائل تُرسل تلقائياً' : 'معطّلة — لن تُرسل أي رسائل'}</p>
+                  </div>
+                </div>
+                <Toggle
+                  checked={appConfig.automationEnabled !== false}
+                  onChange={v => {
+                    const newCfg = { ...appConfig, automationEnabled: v };
+                    setAppConfig(newCfg);
+                    fetch('/api/admin/settings/app_config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ value: newCfg }) });
+                  }}
+                />
+              </div>
+
               {/* ── Automation CRUD ── */}
               <div>
                 <div className="flex items-center justify-between mb-3">
@@ -951,7 +980,7 @@ export default function AdminDashboard() {
                           <div className="flex items-center gap-3 px-4 py-3">
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 flex-wrap">
-                                <span className="text-base">{meta?.icon || '⚡'}</span>
+                                <span className="text-slate-600 dark:text-slate-300 flex-shrink-0">{meta?.icon ?? <Zap size={16} />}</span>
                                 <span className="px-1.5 py-0.5 bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-400 text-[10px] font-bold rounded uppercase tracking-wide">إذا</span>
                                 <span className="text-sm font-medium text-slate-900 dark:text-white truncate">{meta?.ifLabel || rule.trigger}</span>
                               </div>
@@ -1027,11 +1056,63 @@ export default function AdminDashboard() {
                     <input value={appConfig.tagline} onChange={e => setAppConfig(p => ({ ...p, tagline: e.target.value }))} className={inp} placeholder="خدمة غسيل سيارات..." />
                   </div>
                   <div>
+                    <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5">رقم واتساب المدير (يستقبل إشعارات الحجوزات)</label>
+                    <div className="flex items-center gap-2">
+                      <Smartphone size={16} className="text-slate-400 flex-shrink-0" />
+                      <input value={appConfig.managerPhone || ''} onChange={e => setAppConfig(p => ({ ...p, managerPhone: e.target.value }))} className={inp} placeholder="+9647XXXXXXXXX" dir="ltr" />
+                    </div>
+                  </div>
+                  <div>
                     <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5">رقم الدعم (واتساب)</label>
                     <input value={appConfig.supportPhone} onChange={e => setAppConfig(p => ({ ...p, supportPhone: e.target.value }))} className={inp} placeholder="+9647XXXXXXXXX" dir="ltr" />
                   </div>
                   <button onClick={saveAppConfig} disabled={settingsLoading} className={`w-full py-2.5 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${settingsSaved === 'app' ? 'bg-green-500 text-white' : 'bg-blue-600 hover:bg-blue-700 text-white'} disabled:opacity-50`}>
                     <Save size={14} />{settingsSaved === 'app' ? '✓ تم الحفظ' : 'حفظ إعدادات التطبيق'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Packages editor */}
+              <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-5">
+                <div className="flex items-center gap-2 mb-4">
+                  <Package size={16} className="text-slate-500" />
+                  <h3 className="font-bold text-slate-900 dark:text-white text-sm">إعدادات الباقات</h3>
+                </div>
+                <div className="space-y-4">
+                  {(['basic', 'standard', 'premium'] as const).map(pkg => {
+                    const nameKey = `${pkg}Name` as keyof typeof finConfig;
+                    const descKey = `${pkg}Desc` as keyof typeof finConfig;
+                    const labels = { basic: 'الباقة الأساسية', standard: 'الباقة القياسية', premium: 'الباقة المميزة' };
+                    return (
+                      <div key={pkg} className="border border-slate-100 dark:border-slate-700 rounded-xl p-3 space-y-2">
+                        <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">{labels[pkg]}</p>
+                        <div className="flex gap-2">
+                          <input
+                            value={String(finConfig[nameKey] || '')}
+                            onChange={e => setFinConfig(p => ({ ...p, [nameKey]: e.target.value }))}
+                            className={inp + ' flex-1'}
+                            placeholder="اسم الباقة"
+                          />
+                          <input
+                            type="number"
+                            value={finConfig[pkg]}
+                            onChange={e => setFinConfig(p => ({ ...p, [pkg]: Number(e.target.value) }))}
+                            className={inp + ' w-32 font-mono'}
+                            dir="ltr"
+                            placeholder="السعر"
+                          />
+                        </div>
+                        <input
+                          value={String(finConfig[descKey] || '')}
+                          onChange={e => setFinConfig(p => ({ ...p, [descKey]: e.target.value }))}
+                          className={inp}
+                          placeholder="وصف الباقة (اختياري)"
+                        />
+                      </div>
+                    );
+                  })}
+                  <button onClick={saveFinanceConfig} disabled={settingsLoading} className={`w-full py-2.5 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${settingsSaved === 'finance' ? 'bg-green-500 text-white' : 'bg-blue-600 hover:bg-blue-700 text-white'} disabled:opacity-50`}>
+                    <Save size={14} />{settingsSaved === 'finance' ? '✓ تم الحفظ' : 'حفظ إعدادات الباقات'}
                   </button>
                 </div>
               </div>

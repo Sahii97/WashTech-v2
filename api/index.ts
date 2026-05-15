@@ -174,9 +174,23 @@ async function saveAutomations(rules: AutomationRule[]) {
   await setSetting('automations', rules);
 }
 
-function resolveRecipient(rule: AutomationRule, vars: Record<string, string>): string | null {
+async function getManagerPhone(): Promise<string> {
+  try {
+    const cfg = await getSetting<any>('app_config', {});
+    return cfg.managerPhone || MANAGER_PHONE;
+  } catch {
+    return MANAGER_PHONE;
+  }
+}
+
+async function notifyManager(text: string): Promise<void> {
+  const phone = await getManagerPhone();
+  await sendWhatsApp(phone, text);
+}
+
+function resolveRecipient(rule: AutomationRule, vars: Record<string, string>, managerPhone: string): string | null {
   switch (rule.recipientType) {
-    case 'manager':  return MANAGER_PHONE;
+    case 'manager':  return managerPhone;
     case 'captain':  return vars.driverPhone || null;
     case 'customer': return vars.phone || null;
     case 'custom':   return rule.customPhone || null;
@@ -214,18 +228,21 @@ async function notify(event: EventKey, vars: Record<string, string>, fallbackTo:
     } catch (e) { console.error('[n8n]', e); }
     return;
   }
-  const [templates, automations] = await Promise.all([getTemplates(), getAutomations()]);
+  const [templates, automations, appCfg] = await Promise.all([
+    getTemplates(), getAutomations(), getSetting<any>('app_config', {}).catch(() => ({})),
+  ]);
+  if (appCfg.automationEnabled === false) return;
+  const managerPhone = appCfg.managerPhone || MANAGER_PHONE;
   const cfg = templates[event];
   if (!cfg?.enabled) return;
   const text = applyTemplate(cfg.template, vars);
   const rules = automations.filter(r => r.trigger === event && r.enabled);
   if (!rules.length) {
-    // Fallback: send to the provided phone if no rules match
     await sendWhatsApp(fallbackTo, text);
     return;
   }
   for (const rule of rules) {
-    const to = resolveRecipient(rule, vars) || fallbackTo;
+    const to = resolveRecipient(rule, vars, managerPhone) || fallbackTo;
     await sendWhatsApp(to, text);
   }
 }
@@ -610,7 +627,7 @@ app.post('/api/action', async (req, res) => {
         name: booking.name || '', phone: booking.phone || '',
         driverName: driver.name, slot: booking.slot || '',
       }, booking.phone || '');
-      await sendWhatsApp(MANAGER_PHONE, `✅ الكابتن ${driver.name} قبل مهمة #${id.slice(-6)}\nالعميل: ${booking.name}`);
+      await notifyManager(`✅ الكابتن ${driver.name} قبل مهمة #${id.slice(-6)}\nالعميل: ${booking.name}`);
       return res.json({ success: true, message: 'تم قبول المهمة وإشعار العميل والمدير' });
 
     } else if (act === 'on_road') {
@@ -621,7 +638,7 @@ app.post('/api/action', async (req, res) => {
         name: booking.name || '', phone: booking.phone || '',
         driverName: driver.name, slot: booking.slot || '',
       }, booking.phone || '');
-      await sendWhatsApp(MANAGER_PHONE, `🚀 الكابتن ${driver.name} في الطريق لـ${booking.name}`);
+      await notifyManager(`🚀 الكابتن ${driver.name} في الطريق لـ${booking.name}`);
       return res.json({ success: true, message: 'تم إشعار العميل أن الكابتن في الطريق' });
 
     } else if (act === 'complete') {
@@ -649,7 +666,7 @@ app.post('/api/action', async (req, res) => {
         name: booking.name || '', phone: booking.phone || '',
         amount: totalAmount.toLocaleString('ar-IQ'),
       }, booking.phone || '');
-      await sendWhatsApp(MANAGER_PHONE, `✅ اكتمل حجز #${id.slice(-6)} — 💰 ${totalAmount.toLocaleString('ar-IQ')} د.ع`);
+      await notifyManager(`✅ اكتمل حجز #${id.slice(-6)} — 💰 ${totalAmount.toLocaleString('ar-IQ')} د.ع`);
       return res.json({ success: true, message: 'تم إكمال المهمة وتحديث المحفظة' });
 
     } else {
@@ -718,7 +735,7 @@ app.post('/api/driver/accept-task', async (req, res) => {
         name: booking.name || '', phone: booking.phone || '',
         driverName: driver.name, slot: booking.slot || '',
       }, booking.phone || '');
-      await sendWhatsApp(MANAGER_PHONE, `✅ الكابتن ${driver.name} قبل مهمة #${bookingId.slice(-6)}`);
+      await notifyManager(`✅ الكابتن ${driver.name} قبل مهمة #${bookingId.slice(-6)}`);
     }
     res.json({ success: true });
   } catch (e) { res.status(500).json({ error: 'Failed' }); }
@@ -749,7 +766,7 @@ app.post('/api/driver/on-road', async (req, res) => {
         name: booking.name || '', phone: booking.phone || '',
         driverName: driver.name, slot: booking.slot || '',
       }, booking.phone || '');
-      await sendWhatsApp(MANAGER_PHONE, `🚀 الكابتن ${driver.name} في الطريق لـ${booking.name}`);
+      await notifyManager(`🚀 الكابتن ${driver.name} في الطريق لـ${booking.name}`);
     }
     res.json({ success: true });
   } catch (e) { res.status(500).json({ error: 'Failed' }); }
@@ -797,7 +814,7 @@ app.post('/api/driver/complete-task', async (req, res) => {
       name: booking.name || '', phone: booking.phone || '',
       amount: totalAmount.toLocaleString('ar-IQ'),
     }, booking.phone || '');
-    await sendWhatsApp(MANAGER_PHONE, `✅ اكتمل حجز #${bookingId.slice(-6)} — 💰 ${totalAmount.toLocaleString('ar-IQ')} د.ع`);
+    await notifyManager(`✅ اكتمل حجز #${bookingId.slice(-6)} — 💰 ${totalAmount.toLocaleString('ar-IQ')} د.ع`);
     res.json({ success: true });
   } catch (e) {
     console.error('[complete-task]', e);
@@ -833,7 +850,7 @@ app.post('/api/driver/update-status', async (req, res) => {
         name: booking?.name || '', phone: booking?.phone || '',
         driverName: captain.name, slot: booking?.slot || '',
       }, booking?.phone || '');
-      await sendWhatsApp(MANAGER_PHONE, `✅ الكابتن ${captain.name} قبل مهمة العميل *${booking?.name || ''}*`);
+      await notifyManager(`✅ الكابتن ${captain.name} قبل مهمة العميل *${booking?.name || ''}*`);
     }
     res.json({ success: true });
   } catch { res.status(500).json({ error: 'Failed' }); }
