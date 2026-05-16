@@ -106,7 +106,7 @@ export default function BookingPage() {
     const dateLabel = form.date === 'today' ? tr.today : tr.tomorrow;
     const nextSteps = lang === 'ar'
       ? [
-          'يراجع المدير طلبك أولاً ثم يؤكد الحجز.',
+          'تراجع الإدارة طلبك أولاً ثم تؤكد الحجز.',
           'يصلك تحديث واتساب عند تعيين الكابتن وتحركه إليك.',
           'يمكنك متابعة الحالة في أي وقت برقم هاتفك.',
         ]

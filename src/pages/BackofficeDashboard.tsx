@@ -1,29 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import {
-  Car,
-  Check,
-  ChevronDown,
-  DollarSign,
-  Eye,
-  EyeOff,
-  LayoutGrid,
-  Moon,
-  RefreshCw,
-  Save,
-  Settings,
-  Sun,
-  Terminal,
-  Trash2,
-  UserCog,
-  Users,
-  Wallet,
-} from 'lucide-react';
+import { Car, Check, ChevronDown, DollarSign, Eye, EyeOff, LayoutGrid, Moon, RefreshCw, Save, Settings, Sun, Terminal, Trash2, Wallet } from 'lucide-react';
 import WashTechLogo from '../components/WashTechLogo';
 
-type Section = 'operations' | 'captains' | 'managers' | 'finance' | 'settings';
+type Section = 'operations' | 'captains' | 'finance' | 'settings';
 type Session = { token: string; role: 'admin'; id: string; name: string };
 type Driver = { id: string; name: string; code: string; phone?: string; token?: string };
-type Manager = { id: string; name: string; username: string; token?: string };
 type Booking = {
   id: string;
   name: string;
@@ -227,12 +208,10 @@ export default function BackofficeDashboard() {
   const [loading, setLoading] = useState(false);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [drivers, setDrivers] = useState<Driver[]>([]);
-  const [managers, setManagers] = useState<Manager[]>([]);
   const [driverFilter, setDriverFilter] = useState('all');
   const [bookingTab, setBookingTab] = useState<'pending' | 'active' | 'completed' | 'rejected'>('pending');
   const [selectedDrivers, setSelectedDrivers] = useState<Record<string, string>>({});
   const [newDriver, setNewDriver] = useState({ name: '', code: '', phone: '' });
-  const [newManager, setNewManager] = useState({ name: '', username: '', password: '' });
   const [message, setMessage] = useState('');
   const [finOverview, setFinOverview] = useState<FinanceOverview | null>(null);
   const [finCaptains, setFinCaptains] = useState<FinanceCaptain[]>([]);
@@ -271,17 +250,14 @@ export default function BackofficeDashboard() {
       setBookings(bookingData.bookings || []);
       setDrivers(driverData.drivers || []);
 
-      const [managerRes, financeRes, financeConfigRes, appConfigRes] = await Promise.all([
-        authFetch('/api/admin/managers'),
+      const [financeRes, financeConfigRes, appConfigRes] = await Promise.all([
         authFetch('/api/admin/finance-overview'),
         authFetch('/api/admin/settings/finance_config'),
         authFetch('/api/admin/settings/app_config'),
       ]);
-      const managerData = await managerRes.json();
       const financeData = await financeRes.json();
       const financeConfigData = await financeConfigRes.json();
       const appConfigData = await appConfigRes.json();
-      setManagers(managerData.managers || []);
       setFinOverview(financeData.overview || null);
       setFinCaptains(financeData.captains || []);
       if (financeConfigData?.value) {
@@ -309,7 +285,6 @@ export default function BackofficeDashboard() {
     () => ([
       { key: 'operations', label: 'العمليات', icon: <LayoutGrid size={20} strokeWidth={1.5} /> },
       { key: 'captains', label: 'الكباتن', icon: <Car size={20} strokeWidth={1.5} /> },
-      { key: 'managers', label: 'المدراء', icon: <Users size={20} strokeWidth={1.5} /> },
       { key: 'finance', label: 'المالية', icon: <Wallet size={20} strokeWidth={1.5} /> },
       { key: 'settings', label: 'الإعدادات', icon: <Settings size={20} strokeWidth={1.5} /> },
     ]) as { key: Section; label: string; icon: React.ReactNode }[],
@@ -367,20 +342,6 @@ export default function BackofficeDashboard() {
 
   async function deleteCaptain(id: string) {
     await authFetch(`/api/admin/driver/${id}`, { method: 'DELETE' });
-    await loadCore();
-  }
-
-  async function createManager(e: React.FormEvent) {
-    e.preventDefault();
-    const res = await authFetch('/api/admin/create-manager', { method: 'POST', body: JSON.stringify(newManager) });
-    const data = await res.json();
-    setMessage(data.success ? 'تمت إضافة المدير' : (data.error || 'تعذر الإضافة'));
-    if (data.success) setNewManager({ name: '', username: '', password: '' });
-    await loadCore();
-  }
-
-  async function deleteManager(id: string) {
-    await authFetch(`/api/admin/manager/${id}`, { method: 'DELETE' });
     await loadCore();
   }
 
@@ -590,36 +551,6 @@ export default function BackofficeDashboard() {
             </div>
           )}
 
-          {section === 'managers' && (
-            <div className="space-y-4">
-              <div className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-800">
-                <h2 className="mb-3 text-lg font-bold text-slate-900 dark:text-white">إضافة مدير عمليات</h2>
-                <form onSubmit={createManager} className="space-y-2">
-                  <input value={newManager.name} onChange={e => setNewManager(prev => ({ ...prev, name: e.target.value }))} placeholder="الاسم الكامل" className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm dark:border-slate-600 dark:bg-slate-700 dark:text-white" />
-                  <div className="flex flex-col gap-2 sm:flex-row">
-                    <input value={newManager.username} onChange={e => setNewManager(prev => ({ ...prev, username: e.target.value }))} placeholder="اسم المستخدم" dir="ltr" className="flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm dark:border-slate-600 dark:bg-slate-700 dark:text-white" />
-                    <input value={newManager.password} onChange={e => setNewManager(prev => ({ ...prev, password: e.target.value }))} placeholder="كلمة المرور" type="password" className="flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm dark:border-slate-600 dark:bg-slate-700 dark:text-white" />
-                    <button className="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700">إضافة</button>
-                  </div>
-                </form>
-              </div>
-
-              <div className="space-y-2">
-                {managers.map(manager => (
-                  <div key={manager.id} className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-700 dark:bg-slate-800">
-                    <div>
-                      <p className="font-semibold text-slate-900 dark:text-white">{manager.name}</p>
-                      <p className="text-xs text-slate-400">@{manager.username}</p>
-                    </div>
-                    <button onClick={() => deleteManager(manager.id)} className="rounded-lg p-2 text-slate-300 transition-colors hover:text-red-500">
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
           {section === 'finance' && (
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -658,7 +589,7 @@ export default function BackofficeDashboard() {
                   <input value={appConfig.appName} onChange={e => setAppConfig(prev => ({ ...prev, appName: e.target.value }))} placeholder="اسم التطبيق" className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm dark:border-slate-600 dark:bg-slate-700 dark:text-white" />
                   <input value={appConfig.tagline} onChange={e => setAppConfig(prev => ({ ...prev, tagline: e.target.value }))} placeholder="الوصف" className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm dark:border-slate-600 dark:bg-slate-700 dark:text-white" />
                   <input value={appConfig.supportPhone} onChange={e => setAppConfig(prev => ({ ...prev, supportPhone: e.target.value }))} placeholder="رقم الدعم" dir="ltr" className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm dark:border-slate-600 dark:bg-slate-700 dark:text-white" />
-                  <input value={appConfig.managerPhone} onChange={e => setAppConfig(prev => ({ ...prev, managerPhone: e.target.value }))} placeholder="رقم إشعارات المدير" dir="ltr" className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm dark:border-slate-600 dark:bg-slate-700 dark:text-white" />
+                  <input value={appConfig.managerPhone} onChange={e => setAppConfig(prev => ({ ...prev, managerPhone: e.target.value }))} placeholder="رقم إشعارات الإدارة" dir="ltr" className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm dark:border-slate-600 dark:bg-slate-700 dark:text-white" />
                   <input value={appConfig.wasenderToken} onChange={e => setAppConfig(prev => ({ ...prev, wasenderToken: e.target.value }))} placeholder="Wasender token" dir="ltr" type="password" className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm dark:border-slate-600 dark:bg-slate-700 dark:text-white" />
                   <input value={appConfig.adminPassword} onChange={e => setAppConfig(prev => ({ ...prev, adminPassword: e.target.value }))} placeholder="كلمة مرور الإدارة" dir="ltr" type="password" className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm dark:border-slate-600 dark:bg-slate-700 dark:text-white" />
                 </div>
