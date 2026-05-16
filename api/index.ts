@@ -83,6 +83,10 @@ const MANAGER_PHONE  = process.env.MANAGER_PHONE      || '+9647809471576';
 const N8N_WEBHOOK    = process.env.N8N_WEBHOOK_URL    || '';
 const APP_URL        = process.env.APP_URL             || 'https://wash-tech-v2.vercel.app';
 
+const app = express();
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: true }));
+
 const DEFAULT_SLOTS = [
   '8:00 صباحاً','8:30 صباحاً','9:00 صباحاً','9:30 صباحاً',
   '10:00 صباحاً','10:30 صباحاً','11:00 صباحاً','11:30 صباحاً',
