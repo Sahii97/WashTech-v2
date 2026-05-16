@@ -29,6 +29,7 @@ interface AutomationRule {
   trigger: EventKey;
   recipientType: RecipientType;
   customPhone?: string;
+  template?: string;
 }
 
 // ── Sample values for message preview ────────────────────────
@@ -265,6 +266,9 @@ export default function AdminDashboard() {
   const [addingRuleForEvent, setAddingRuleForEvent] = useState<EventKey | null>(null);
   const [addingStandaloneRule, setAddingStandaloneRule] = useState(false);
   const [showPreview,      setShowPreview]      = useState<Partial<Record<EventKey, boolean>>>({});
+  const [expandedRuleTemplate, setExpandedRuleTemplate] = useState<string | null>(null);
+  const [ruleTemplateEdits, setRuleTemplateEdits] = useState<Record<string, string>>({});
+  const ruleTextareaRefs = useRef<Record<string, HTMLTextAreaElement | null>>({});
 
   useEffect(() => { loadAll(); }, []);
 
@@ -517,6 +521,31 @@ export default function AdminDashboard() {
     }).catch(() => {});
   }
 
+  function toggleRuleTemplate(rule: AutomationRule) {
+    if (expandedRuleTemplate === rule.id) {
+      setExpandedRuleTemplate(null);
+    } else {
+      setExpandedRuleTemplate(rule.id);
+      setRuleTemplateEdits(p => ({ ...p, [rule.id]: rule.template ?? '' }));
+    }
+  }
+
+  function insertRuleVar(ruleId: string, v: string) {
+    const el = ruleTextareaRefs.current[ruleId];
+    if (!el) return;
+    const s = el.selectionStart ?? el.value.length;
+    const e = el.selectionEnd ?? el.value.length;
+    const token = `{{${v}}}`;
+    setRuleTemplateEdits(p => ({ ...p, [ruleId]: el.value.slice(0, s) + token + el.value.slice(e) }));
+    setTimeout(() => { el.selectionStart = el.selectionEnd = s + token.length; el.focus(); }, 0);
+  }
+
+  async function saveRuleTemplate(ruleId: string) {
+    const template = ruleTemplateEdits[ruleId] ?? '';
+    await patchRule(ruleId, { template });
+    setExpandedRuleTemplate(null);
+  }
+
   // ── Render ────────────────────────────────────────────────────
   return (
     <div dir="rtl" className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col">
@@ -650,15 +679,72 @@ export default function AdminDashboard() {
                                   onCancel={() => setEditingRuleId(null)}
                                 />
                               ) : (
-                                <div key={rule.id} className={`flex items-center gap-2 rounded-lg px-3 py-2 transition-opacity ${rule.enabled ? '' : 'opacity-50'}`} style={{ background: 'rgba(0,0,0,0.03)' }}>
-                                  <span className="flex-1 text-sm font-medium text-slate-800 dark:text-slate-200">
-                                    {RECIPIENT_LABELS[rule.recipientType]}
-                                    {rule.customPhone && <span className="font-mono text-xs text-slate-400 mr-2" dir="ltr">{rule.customPhone}</span>}
-                                  </span>
-                                  <Toggle checked={rule.enabled} onChange={v => patchRule(rule.id, { enabled: v })} />
-                                  <button onClick={() => { setEditingRuleId(rule.id); setAddingRuleForEvent(null); }} className="p-1.5 text-slate-400 hover:text-blue-500 rounded-lg transition-colors"><Pencil size={12} /></button>
-                                  <button onClick={() => deleteRule(rule.id)} className="p-1.5 text-slate-400 hover:text-red-500 rounded-lg transition-colors"><Trash2 size={12} /></button>
-                                </div>
+                                <React.Fragment key={rule.id}>
+                                  <div className={`flex items-center gap-2 rounded-lg px-3 py-2 transition-opacity ${rule.enabled ? '' : 'opacity-50'}`} style={{ background: 'rgba(0,0,0,0.03)' }}>
+                                    <span className="flex-1 text-sm font-medium text-slate-800 dark:text-slate-200">
+                                      {RECIPIENT_LABELS[rule.recipientType]}
+                                      {rule.customPhone && <span className="font-mono text-xs text-slate-400 mr-2" dir="ltr">{rule.customPhone}</span>}
+                                      {rule.template && <span className="mr-1.5 text-[10px] text-blue-500 font-semibold bg-blue-50 dark:bg-blue-950 px-1.5 py-0.5 rounded-md">رسالة مخصصة</span>}
+                                    </span>
+                                    <Toggle checked={rule.enabled} onChange={v => patchRule(rule.id, { enabled: v })} />
+                                    <button type="button" onClick={() => toggleRuleTemplate(rule)} className={`p-1.5 rounded-lg transition-colors ${expandedRuleTemplate === rule.id ? 'text-blue-500 bg-blue-50 dark:bg-blue-950' : 'text-slate-400 hover:text-blue-500'}`} title="رسالة مخصصة"><Smartphone size={12} /></button>
+                                    <button type="button" onClick={() => { setEditingRuleId(rule.id); setAddingRuleForEvent(null); setExpandedRuleTemplate(null); }} className="p-1.5 text-slate-400 hover:text-blue-500 rounded-lg transition-colors"><Pencil size={12} /></button>
+                                    <button type="button" onClick={() => deleteRule(rule.id)} className="p-1.5 text-slate-400 hover:text-red-500 rounded-lg transition-colors"><Trash2 size={12} /></button>
+                                  </div>
+                                  {expandedRuleTemplate === rule.id && (
+                                    <div className="mr-2 ml-2 p-3 bg-blue-50 dark:bg-blue-950/30 rounded-xl border border-blue-100 dark:border-blue-800 space-y-2.5">
+                                      <div>
+                                        <p className="text-xs font-semibold text-blue-700 dark:text-blue-300">رسالة مخصصة لـ {RECIPIENT_LABELS[rule.recipientType]}</p>
+                                        <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">اتركها فارغة لاستخدام رسالة الحدث الافتراضية</p>
+                                      </div>
+                                      <div className="flex flex-wrap gap-1">
+                                        {meta.vars.map(v => (
+                                          <button key={v} type="button" onClick={() => insertRuleVar(rule.id, v)}
+                                            className="px-2 py-0.5 bg-white dark:bg-slate-800 hover:bg-blue-100 dark:hover:bg-blue-900 text-blue-600 dark:text-blue-400 text-xs font-mono rounded border border-blue-200 dark:border-blue-700 transition-colors">
+                                            {v}
+                                          </button>
+                                        ))}
+                                      </div>
+                                      {ruleTemplateEdits[rule.id] && (
+                                        <div className="rounded-xl overflow-hidden border border-slate-200 dark:border-slate-600">
+                                          <div className="bg-[#e5ddd5] dark:bg-[#0c1317] px-2 py-2">
+                                            <MessageCard from="WashTech" body={renderPreview(ruleTemplateEdits[rule.id])} time={now} compact={false} />
+                                          </div>
+                                        </div>
+                                      )}
+                                      <div className="bg-[#f0f2f5] dark:bg-slate-900/50 flex items-end gap-2 px-2 py-2 rounded-xl border border-slate-200 dark:border-slate-600">
+                                        <textarea
+                                          ref={el => { ruleTextareaRefs.current[rule.id] = el; }}
+                                          value={ruleTemplateEdits[rule.id] ?? ''}
+                                          onChange={e => setRuleTemplateEdits(p => ({ ...p, [rule.id]: e.target.value }))}
+                                          rows={3}
+                                          dir="auto"
+                                          placeholder={`رسالة مخصصة لـ ${RECIPIENT_LABELS[rule.recipientType]}...`}
+                                          className="flex-1 bg-white dark:bg-slate-700 border-0 rounded-xl text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-blue-400/30 font-mono"
+                                        />
+                                        <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center flex-shrink-0 mb-0.5">
+                                          <Send size={14} strokeWidth={2} className="text-white" />
+                                        </div>
+                                      </div>
+                                      <div className="flex gap-2">
+                                        <button type="button" onClick={() => saveRuleTemplate(rule.id)}
+                                          className="flex-1 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-colors flex items-center justify-center gap-1.5">
+                                          <Check size={12} strokeWidth={3} /> حفظ الرسالة
+                                        </button>
+                                        {rule.template && (
+                                          <button type="button" onClick={() => setRuleTemplateEdits(p => ({ ...p, [rule.id]: '' }))}
+                                            className="px-3 py-2 bg-white dark:bg-slate-800 hover:bg-red-50 dark:hover:bg-red-950 text-slate-500 hover:text-red-500 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-600 transition-colors">
+                                            مسح
+                                          </button>
+                                        )}
+                                        <button type="button" onClick={() => setExpandedRuleTemplate(null)}
+                                          className="px-3 py-2 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-600 transition-colors">
+                                          إغلاق
+                                        </button>
+                                      </div>
+                                    </div>
+                                  )}
+                                </React.Fragment>
                               )
                             )}
                             {eventRules.length === 0 && !isAddingForThis && (

@@ -214,6 +214,7 @@ export interface AutomationRule {
   trigger: EventKey;
   recipientType: RecipientType;
   customPhone?: string;
+  template?: string;
 }
 
 const DEFAULT_AUTOMATIONS: AutomationRule[] = [
@@ -299,15 +300,15 @@ async function notify(event: EventKey, vars: Record<string, string>, fallbackTo:
   const managerPhone = appCfg.managerPhone || MANAGER_PHONE;
   const cfg = templates[event];
   if (!cfg?.enabled) return;
-  const text = applyTemplate(cfg.template, vars);
   const rules = automations.filter(r => r.trigger === event && r.enabled);
   if (!rules.length) {
-    await sendWhatsApp(fallbackTo, text);
+    await sendWhatsApp(fallbackTo, applyTemplate(cfg.template, vars));
     return;
   }
   for (const rule of rules) {
     const to = resolveRecipient(rule, vars, managerPhone) || fallbackTo;
-    await sendWhatsApp(to, text);
+    const tpl = (rule.template && rule.template.trim()) ? rule.template : cfg.template;
+    await sendWhatsApp(to, applyTemplate(tpl, vars));
   }
 }
 
