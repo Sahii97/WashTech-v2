@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { LayoutGrid, Bell, Car, Users, MapPin, Play, Trash2, Plus, Check, RefreshCw, Moon, Sun, Send, TrendingUp, Pencil, X, ChevronDown, Terminal, Wallet, DollarSign, ArrowDownLeft, ArrowUpRight, Save, Package, CheckCheck, XCircle, Navigation, Star, Smartphone, Zap } from 'lucide-react';
+import { LayoutGrid, Bell, Car, Users, MapPin, Play, Trash2, Plus, Check, RefreshCw, Moon, Sun, Send, TrendingUp, Pencil, X, ChevronDown, Terminal, Wallet, DollarSign, ArrowDownLeft, ArrowUpRight, Save, Package, CheckCheck, XCircle, Navigation, Star, Smartphone, Zap, Eye, EyeOff } from 'lucide-react';
 import MessageCard from '../components/MessageCard';
 import WashTechLogo from '../components/WashTechLogo';
 
@@ -266,17 +266,20 @@ function RuleForm({
 
 // ── Main component ────────────────────────────────────────────
 function AdminLogin({ onLogin }: { onLogin: () => void }) {
-  const [pw, setPw]   = useState('');
-  const [err, setErr] = useState('');
+  const [pw, setPw]       = useState('');
+  const [show, setShow]   = useState(false);
+  const [err, setErr]     = useState('');
   const [loading, setLoading] = useState(false);
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setErr(''); setLoading(true);
-    const res = await fetch('/api/admin/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: pw }) });
-    const d = await res.json();
+    try {
+      const res = await fetch('/api/admin/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: pw }) });
+      const d = await res.json();
+      if (res.ok) { localStorage.setItem('wt_adm', '1'); onLogin(); }
+      else setErr(d.error || 'كلمة المرور غير صحيحة');
+    } catch { setErr('تعذر الاتصال بالخادم'); }
     setLoading(false);
-    if (res.ok) { localStorage.setItem('wt_adm', '1'); onLogin(); }
-    else setErr(d.error || 'خطأ');
   }
   return (
     <div dir="rtl" className="min-h-[100dvh] bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-4">
@@ -285,8 +288,14 @@ function AdminLogin({ onLogin }: { onLogin: () => void }) {
         <h1 className="text-lg font-bold text-slate-900 dark:text-white mb-1">لوحة التحكم</h1>
         <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">أدخل كلمة المرور للدخول</p>
         <form onSubmit={submit} className="space-y-3">
-          <input type="password" value={pw} onChange={e => setPw(e.target.value)} placeholder="كلمة المرور" dir="ltr"
-            className="w-full px-3 py-2.5 border border-slate-200 dark:border-slate-600 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 bg-white dark:bg-slate-700 dark:text-white" />
+          <div className="relative">
+            <input type={show ? 'text' : 'password'} value={pw} onChange={e => setPw(e.target.value)} placeholder="كلمة المرور" dir="ltr"
+              className="w-full px-3 py-2.5 border border-slate-200 dark:border-slate-600 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 bg-white dark:bg-slate-700 dark:text-white pl-10" />
+            <button type="button" onClick={() => setShow(s => !s)}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300">
+              {show ? <EyeOff size={16} /> : <Eye size={16} />}
+            </button>
+          </div>
           {err && <p className="text-xs text-red-500">{err}</p>}
           <button type="submit" disabled={loading || !pw}
             className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white font-bold text-sm rounded-xl transition-colors">

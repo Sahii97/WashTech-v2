@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Check as IcCheck, X as IcX, RefreshCw as IcRefresh, ChevronDown, Banknote as IcDollar, User as IcUser, Wallet as IcWallet, TrendingUp, ArrowUpRight, ArrowDownLeft } from 'lucide-react';
+import { Check as IcCheck, X as IcX, RefreshCw as IcRefresh, ChevronDown, Banknote as IcDollar, User as IcUser, Wallet as IcWallet, TrendingUp, ArrowUpRight, ArrowDownLeft, Eye, EyeOff } from 'lucide-react';
 import WashTechLogo from '../components/WashTechLogo';
 
 type Booking = {
@@ -32,18 +32,21 @@ const DEFAULT_PRICES: Record<string, number> = { basic: 15000, standard: 25000, 
 function ManagerLogin({ onLogin }: { onLogin: (name: string) => void }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [show, setShow]         = useState(false);
   const [err, setErr]           = useState('');
   const [loading, setLoading]   = useState(false);
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setErr(''); setLoading(true);
-    const res = await fetch('/api/manager/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password }) });
-    const d = await res.json();
+    try {
+      const res = await fetch('/api/manager/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password }) });
+      const d = await res.json();
+      if (res.ok) {
+        localStorage.setItem('wt_mgr', JSON.stringify({ id: d.manager.id, name: d.manager.name }));
+        onLogin(d.manager.name);
+      } else setErr(d.error || 'اسم المستخدم أو كلمة المرور غير صحيحة');
+    } catch { setErr('تعذر الاتصال بالخادم'); }
     setLoading(false);
-    if (res.ok) {
-      localStorage.setItem('wt_mgr', JSON.stringify({ id: d.manager.id, name: d.manager.name }));
-      onLogin(d.manager.name);
-    } else setErr(d.error || 'خطأ');
   }
   return (
     <div dir="rtl" className="min-h-[100dvh] bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-4">
@@ -54,8 +57,14 @@ function ManagerLogin({ onLogin }: { onLogin: (name: string) => void }) {
         <form onSubmit={submit} className="space-y-3">
           <input value={username} onChange={e => setUsername(e.target.value)} placeholder="اسم المستخدم" dir="ltr"
             className="w-full px-3 py-2.5 border border-slate-200 dark:border-slate-600 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 bg-white dark:bg-slate-700 dark:text-white" />
-          <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="كلمة المرور" dir="ltr"
-            className="w-full px-3 py-2.5 border border-slate-200 dark:border-slate-600 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 bg-white dark:bg-slate-700 dark:text-white" />
+          <div className="relative">
+            <input type={show ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} placeholder="كلمة المرور" dir="ltr"
+              className="w-full px-3 py-2.5 border border-slate-200 dark:border-slate-600 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 bg-white dark:bg-slate-700 dark:text-white pl-10" />
+            <button type="button" onClick={() => setShow(s => !s)}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300">
+              {show ? <EyeOff size={16} /> : <Eye size={16} />}
+            </button>
+          </div>
           {err && <p className="text-xs text-red-500">{err}</p>}
           <button type="submit" disabled={loading || !username || !password}
             className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white font-bold text-sm rounded-xl transition-colors">
