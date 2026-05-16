@@ -977,7 +977,8 @@ app.post('/api/admin/automations/add', async (req, res) => {
     const automations = await getAutomations();
     const newRule: AutomationRule = {
       id: `r_custom_${Date.now()}`,
-      enabled: true, trigger, recipientType, customPhone: customPhone || undefined,
+      enabled: true, trigger, recipientType,
+      ...(customPhone ? { customPhone } : {}),
     };
     await saveAutomations([...automations, newRule]);
     res.json({ success: true, rule: newRule });
@@ -990,7 +991,9 @@ app.patch('/api/admin/automations/:id', async (req, res) => {
     const automations = await getAutomations();
     const idx = automations.findIndex(r => r.id === id);
     if (idx === -1) return res.status(404).json({ error: 'Rule not found' });
-    automations[idx] = { ...automations[idx], ...req.body, id };
+    // Strip undefined values — Firestore rejects them
+    const patch = Object.fromEntries(Object.entries(req.body).filter(([, v]) => v !== undefined));
+    automations[idx] = { ...automations[idx], ...patch, id } as AutomationRule;
     await saveAutomations(automations);
     res.json({ success: true, rule: automations[idx] });
   } catch (e: any) { res.status(500).json({ error: e.message || 'Server error' }); }

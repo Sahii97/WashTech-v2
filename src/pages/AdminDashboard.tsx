@@ -501,9 +501,11 @@ export default function AdminDashboard() {
   }
 
   async function saveEditRule(id: string, data: Partial<AutomationRule>) {
+    // Remove undefined values — Firestore rejects them
+    const clean = Object.fromEntries(Object.entries(data).filter(([, v]) => v !== undefined));
     const res = await fetch(`/api/admin/automations/${id}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
+      body: JSON.stringify(clean),
     });
     const d = await res.json();
     if (!res.ok) throw new Error(d.error || 'فشل التعديل');
