@@ -85,7 +85,6 @@ export default function ManagerDashboard() {
   const [tab,             setTab]             = useState<Tab>('pending');
   const [selectedDrivers, setSelectedDrivers] = useState<Record<string, string>>({});
   const [driverFilter,    setDriverFilter]    = useState('all');
-  const [query,           setQuery]           = useState('');
   const [loading,         setLoading]         = useState(false);
   const [pkgPrices,       setPkgPrices]       = useState<Record<string, number>>(DEFAULT_PRICES);
 
@@ -158,17 +157,7 @@ export default function ManagerDashboard() {
       tab === 'completed'  ? ['completed', 'closed'].includes(b.status) :
       tab === 'rejected'   ? b.status === 'rejected' : false
     )
-    .filter(b => driverFilter === 'all' ? true : b.driverId === driverFilter)
-    .filter(b => {
-      const q = query.trim().toLowerCase();
-      if (!q) return true;
-      return (
-        b.name.toLowerCase().includes(q) ||
-        b.phone.toLowerCase().includes(q) ||
-        b.neighborhood.toLowerCase().includes(q) ||
-        b.id.toLowerCase().includes(q)
-      );
-    });
+    .filter(b => driverFilter === 'all' ? true : b.driverId === driverFilter);
 
   const counts = {
     pending:   bookings.filter(b => b.status === 'pending').length,
@@ -187,7 +176,6 @@ export default function ManagerDashboard() {
 
   const inp = 'w-full px-3 py-2.5 border border-slate-200 dark:border-slate-600 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 bg-white dark:bg-slate-700 dark:text-white transition';
   const summaryBookings = bookings.filter(b => driverFilter === 'all' ? true : b.driverId === driverFilter);
-  const selectedDriver = driverFilter === 'all' ? null : drivers.find(d => d.id === driverFilter) || null;
   const summaryStats = {
     total: summaryBookings.length,
     active: summaryBookings.filter(b => ACTIVE_STATUSES.includes(b.status)).length,
@@ -248,30 +236,6 @@ export default function ManagerDashboard() {
                   {driver.name}
                 </FilterChip>
               ))}
-            </div>
-          </div>
-          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_280px] gap-3 items-start">
-            <input
-              value={query}
-              onChange={e => setQuery(e.target.value)}
-              placeholder="ابحث بالاسم أو الهاتف أو رقم الحجز"
-              className={inp}
-              dir="rtl"
-            />
-            <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 p-3 min-h-[88px]">
-              {selectedDriver ? (
-                <div className="space-y-1.5 text-sm">
-                  <p className="font-bold text-slate-900 dark:text-white">{selectedDriver.name}</p>
-                  <p className="text-slate-500 dark:text-slate-400">كود: <span dir="ltr">{selectedDriver.code}</span></p>
-                  {selectedDriver.phone && <p className="text-slate-500 dark:text-slate-400" dir="ltr">{selectedDriver.phone}</p>}
-                  <p className="text-slate-500 dark:text-slate-400">أنجز {summaryStats.completed} طلبات من أصل {summaryStats.total}</p>
-                </div>
-              ) : (
-                <div className="space-y-1.5 text-sm text-slate-500 dark:text-slate-400">
-                  <p className="font-semibold text-slate-700 dark:text-slate-200">نظرة سريعة</p>
-                  <p>اختر كابتناً لرؤية طلباته، نشاطه، وقيمة الطلبات من نفس الشاشة.</p>
-                </div>
-              )}
             </div>
           </div>
         </div>
