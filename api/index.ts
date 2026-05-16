@@ -82,10 +82,66 @@ const WASENDER_TOKEN = process.env.WASENDER_API_TOKEN || '';
 const MANAGER_PHONE  = process.env.MANAGER_PHONE      || '+9647809471576';
 const N8N_WEBHOOK    = process.env.N8N_WEBHOOK_URL    || '';
 const APP_URL        = process.env.APP_URL             || 'https://wash-tech-v2.vercel.app';
+const SESSION_SECRET = process.env.SESSION_SECRET      || process.env.ADMIN_PASSWORD || 'washtech-session-secret';
 
 const app = express();
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true }));
+
+type StaffRole = 'admin' | 'manager' | 'captain';
+type SessionPayload = {
+  role: StaffRole;
+  id: string;
+  name: string;
+  exp: number;
+};
+
+function base64UrlEncode(value: string) {
+  return Buffer.from(value).toString('base64url');
+}
+
+function base64UrlDecode(value: string) {
+  return Buffer.from(value, 'base64url').toString('utf8');
+}
+
+function signSession(payload: Omit<SessionPayload, 'exp'>, ttlMs = 7 * 24 * 60 * 60 * 1000): string {
+  const body: SessionPayload = { ...payload, exp: Date.now() + ttlMs };
+  const encoded = base64UrlEncode(JSON.stringify(body));
+  const signature = crypto.createHmac('sha256', SESSION_SECRET).update(encoded).digest('base64url');
+  return `${encoded}.${signature}`;
+}
+
+function verifySession(token?: string | null): SessionPayload | null {
+  if (!token) return null;
+  const [encoded, signature] = token.split('.');
+  if (!encoded || !signature) return null;
+  const expected = crypto.createHmac('sha256', SESSION_SECRET).update(encoded).digest('base64url');
+  if (expected !== signature) return null;
+  try {
+    const payload = JSON.parse(base64UrlDecode(encoded)) as SessionPayload;
+    if (!payload.exp || payload.exp < Date.now()) return null;
+    return payload;
+  } catch {
+    return null;
+  }
+}
+
+function getSessionFromRequest(req: express.Request): SessionPayload | null {
+  const header = req.headers.authorization || '';
+  const token = header.startsWith('Bearer ') ? header.slice(7) : '';
+  return verifySession(token);
+}
+
+function requireRole(roles: StaffRole[]) {
+  return (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    const session = getSessionFromRequest(req);
+    if (!session || !roles.includes(session.role)) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    (req as any).session = session;
+    next();
+  };
+}
 
 const DEFAULT_SLOTS = [
   '8:00 صباحاً','8:30 صباحاً','9:00 صباحاً','9:30 صباحاً',
@@ -356,7 +412,10 @@ app.post('/api/manager/login', async (req, res) => {
     const snap = await getDocs(collection(db, 'managers'));
     const mgr = snap.docs.map(d => ({ id: d.id, ...(d.data() as any) }))
       .find(m => m.username === username && m.password === password);
-    if (mgr) res.json({ success: true, manager: { id: mgr.id, name: mgr.name } });
+    if (mgr) {
+      const token = signSession({ role: 'manager', id: mgr.id, name: mgr.name });
+      res.json({ success: true, token, manager: { id: mgr.id, name: mgr.name, role: 'manager' } });
+    }
     else res.status(401).json({ error: 'اسم المستخدم أو كلمة المرور غير صحيحة' });
   } catch (e) { res.status(500).json({ error: 'خطأ في الخادم' }); }
 });
@@ -368,7 +427,10 @@ app.post('/api/captain/login', async (req, res) => {
     const snap = await getDocs(collection(db, 'drivers'));
     const cpt = snap.docs.map(d => ({ id: d.id, ...(d.data() as any) }))
       .find(c => String(c.code) === String(code));
-    if (cpt) res.json({ success: true, captain: { id: cpt.id, name: cpt.name } });
+    if (cpt) {
+      const token = signSession({ role: 'captain', id: cpt.id, name: cpt.name });
+      res.json({ success: true, token, captain: { id: cpt.id, name: cpt.name } });
+    }
     else res.status(401).json({ error: 'الكود غير صحيح' });
   } catch (e) { res.status(500).json({ error: 'خطأ في الخادم' }); }
 });
@@ -379,7 +441,10 @@ app.post('/api/admin/login', async (req, res) => {
   try {
     const cfg = await getSetting<any>('app_config', {});
     const adminPwd = cfg.adminPassword || process.env.ADMIN_PASSWORD || 'admin';
-    if (password === adminPwd) res.json({ success: true });
+    if (password === adminPwd) {
+      const token = signSession({ role: 'admin', id: 'admin', name: 'Admin' });
+      res.json({ success: true, token, admin: { id: 'admin', name: 'Admin', role: 'admin' } });
+    }
     else res.status(401).json({ error: 'كلمة المرور غير صحيحة' });
   } catch (e) { res.status(500).json({ error: 'خطأ في الخادم' }); }
 });
@@ -392,7 +457,10 @@ app.get('/api/auth/manager', async (req, res) => {
   if (!token) return res.status(400).json({ error: 'token required' });
   const managers = await getManagers();
   const mgr = (managers as any[]).find(m => m.token === token);
-  if (mgr) res.json({ success: true, manager: { id: mgr.id, name: mgr.name } });
+  if (mgr) {
+    const sessionToken = signSession({ role: 'manager', id: mgr.id, name: mgr.name });
+    res.json({ success: true, token: sessionToken, manager: { id: mgr.id, name: mgr.name, role: 'manager' } });
+  }
   else res.status(401).json({ error: 'رابط غير صالح أو منتهي' });
 });
 
@@ -401,11 +469,14 @@ app.get('/api/auth/captain', async (req, res) => {
   if (!token) return res.status(400).json({ error: 'token required' });
   const captains = await getCaptains();
   const cpt = (captains as any[]).find(c => c.token === token);
-  if (cpt) res.json({ success: true, captain: { id: cpt.id, name: cpt.name } });
+  if (cpt) {
+    const sessionToken = signSession({ role: 'captain', id: cpt.id, name: cpt.name });
+    res.json({ success: true, token: sessionToken, captain: { id: cpt.id, name: cpt.name } });
+  }
   else res.status(401).json({ error: 'رابط غير صالح أو منتهي' });
 });
 
-app.post('/api/admin/generate-token', async (req, res) => {
+app.post('/api/admin/generate-token', requireRole(['admin']), async (req, res) => {
   const { role, id } = req.body || {};
   if (!role || !id) return res.status(400).json({ error: 'role and id required' });
   const token = crypto.randomBytes(20).toString('hex');
@@ -524,7 +595,7 @@ app.post('/api/admin/create-captain', async (req, res) => {
   res.json({ success: true, captain: { id, name, code, phone: normalizedPhone } });
 });
 // Alias
-app.post('/api/admin/create-driver', async (req, res) => {
+app.post('/api/admin/create-driver', requireRole(['admin']), async (req, res) => {
   const { name, code, phone } = req.body;
   if (!name || !code) return res.status(400).json({ error: 'Name and code required' });
   const id = `d${Date.now()}`;
@@ -539,7 +610,7 @@ app.delete('/api/admin/captain/:id', async (req, res) => {
   await deleteDoc(doc(db, 'drivers', req.params.id));
   res.json({ success: true });
 });
-app.delete('/api/admin/driver/:id', async (req, res) => {
+app.delete('/api/admin/driver/:id', requireRole(['admin']), async (req, res) => {
   await deleteDoc(doc(db, 'drivers', req.params.id));
   res.json({ success: true });
 });
@@ -565,7 +636,7 @@ app.get('/api/captain/wallet', async (req, res) => {
   }
 });
 
-app.post('/api/captain/transaction', async (req, res) => {
+app.post('/api/captain/transaction', requireRole(['admin']), async (req, res) => {
   const { driverId, type, amount, note } = req.body;
   if (!driverId || !type || !amount) return res.status(400).json({ error: 'Missing fields' });
   try {
@@ -667,40 +738,24 @@ app.get('/api/track', async (req, res) => {
 });
 
 // ── Manager accounts ──────────────────────────────────────────
-app.get('/api/admin/managers', async (_req, res) => {
+app.get('/api/admin/managers', requireRole(['admin']), async (_req, res) => {
   const managers = await getManagers();
   res.json({ managers: managers.map(m => ({ id: m.id, name: m.name, username: m.username })) });
 });
-app.post('/api/admin/create-manager', async (req, res) => {
+app.post('/api/admin/create-manager', requireRole(['admin']), async (req, res) => {
   const { name, username, password } = req.body;
   if (!name || !username || !password) return res.status(400).json({ error: 'All fields required' });
   const id = `mgr${Date.now()}`;
   await setDoc(doc(db, 'managers', id), { name, username, password });
   res.json({ success: true, manager: { id, name, username } });
 });
-app.delete('/api/admin/manager/:id', async (req, res) => {
+app.delete('/api/admin/manager/:id', requireRole(['admin']), async (req, res) => {
   await deleteDoc(doc(db, 'managers', req.params.id));
   res.json({ success: true });
 });
 
 // ── Manager login & actions ───────────────────────────────────
-app.post('/api/manager/login', async (req, res) => {
-  const { username, password } = req.body;
-  try {
-    if (username?.trim()) {
-      const managers = await getManagers();
-      const manager = managers.find((m: any) => m.username === username.trim() && m.password === password);
-      if (manager) return res.json({ success: true, manager: { id: manager.id, name: manager.name, username: manager.username } });
-      if (managers.length > 0) return res.status(401).json({ error: 'Invalid credentials' });
-    }
-    if (password === (process.env.MANAGER_PASSWORD || 'admin123')) return res.json({ success: true });
-    res.status(401).json({ error: 'Invalid credentials' });
-  } catch (e) {
-    res.status(500).json({ error: 'Server error, try again' });
-  }
-});
-
-app.post('/api/manager/action', async (req, res) => {
+app.post('/api/manager/action', requireRole(['admin', 'manager']), async (req, res) => {
   const { bookingId, action, driverId } = req.body;
   if (!bookingId || !action) return res.status(400).json({ error: 'Missing fields' });
   try {
@@ -1037,7 +1092,7 @@ app.post('/api/driver/update-status', async (req, res) => {
 });
 
 // ── Admin Reset ───────────────────────────────────────────────
-app.post('/api/admin/reset', async (_req, res) => {
+app.post('/api/admin/reset', requireRole(['admin']), async (_req, res) => {
   try {
     const bookSnap = await getDocs(collection(db, 'bookings'));
     await Promise.all(bookSnap.docs.map(d => deleteDoc(doc(db, 'bookings', d.id))));
@@ -1068,7 +1123,21 @@ app.post('/api/admin/reset', async (_req, res) => {
 app.get('/api/admin/settings/:key', async (req, res) => {
   try {
     const snap = await getDoc(doc(db, 'settings', req.params.key));
-    res.json(snap.exists() ? snap.data() : { value: null });
+    const data = snap.exists() ? snap.data() : { value: null };
+    if (req.params.key === 'app_config') {
+      const session = getSessionFromRequest(req);
+      const raw = (data as any)?.value || {};
+      if (session?.role === 'admin') return res.json(data);
+      return res.json({
+        value: {
+          appName: raw.appName || 'WashTech',
+          tagline: raw.tagline || '',
+          supportPhone: raw.supportPhone || '',
+          automationEnabled: raw.automationEnabled !== false,
+        },
+      });
+    }
+    res.json(data);
   } catch (e) {
     console.error(`[settings GET ${req.params.key}]`, e);
     // Always return a safe default — never 500 on a GET
@@ -1076,7 +1145,7 @@ app.get('/api/admin/settings/:key', async (req, res) => {
   }
 });
 
-app.post('/api/admin/settings/:key', async (req, res) => {
+app.post('/api/admin/settings/:key', requireRole(['admin']), async (req, res) => {
   const { value } = req.body;
   if (value === undefined) return res.status(400).json({ error: 'value required' });
   try {
@@ -1089,7 +1158,7 @@ app.post('/api/admin/settings/:key', async (req, res) => {
 });
 
 // ── Manager financial overview ─────────────────────────────────
-app.get('/api/manager/finance/overview', async (_req, res) => {
+app.get('/api/manager/finance/overview', requireRole(['admin', 'manager']), async (_req, res) => {
   try {
     const [bookSnap, captainSnap] = await Promise.all([
       getDocs(collection(db, 'bookings')),
@@ -1111,7 +1180,7 @@ app.get('/api/manager/finance/overview', async (_req, res) => {
   } catch { res.status(500).json({ error: 'Failed' }); }
 });
 
-app.get('/api/manager/finance/captains', async (_req, res) => {
+app.get('/api/manager/finance/captains', requireRole(['admin', 'manager']), async (_req, res) => {
   try {
     const snap = await getDocs(collection(db, 'drivers'));
     const captains = snap.docs.map(d => {
@@ -1122,20 +1191,52 @@ app.get('/api/manager/finance/captains', async (_req, res) => {
   } catch { res.status(500).json({ error: 'Failed' }); }
 });
 
+app.get('/api/admin/finance-overview', requireRole(['admin']), async (_req, res) => {
+  try {
+    const [bookSnap, captainSnap] = await Promise.all([
+      getDocs(collection(db, 'bookings')),
+      getDocs(collection(db, 'drivers')),
+    ]);
+    const bookings = bookSnap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
+    const completed = bookings.filter(b => ['completed', 'closed'].includes(b.status) && b.financials);
+    const overview = {
+      totalRevenue: completed.reduce((s, b) => s + (b.financials?.totalAmount || 0), 0),
+      companyRevenue: completed.reduce((s, b) => s + (b.financials?.companyShare || 0), 0),
+      captainPayouts: completed.reduce((s, b) => s + (b.financials?.captainShare || 0), 0),
+      completedCount: completed.length,
+    };
+    const captains = captainSnap.docs.map(d => {
+      const data = d.data() as any;
+      return {
+        id: d.id,
+        name: data.name,
+        phone: data.phone,
+        balance: data.wallet?.balance || 0,
+        totalEarned: data.wallet?.totalEarned || 0,
+        totalWithdrawn: data.wallet?.totalWithdrawn || 0,
+        totalCollected: data.wallet?.totalCollected || 0,
+      };
+    });
+    res.json({ overview, captains });
+  } catch {
+    res.status(500).json({ error: 'Failed' });
+  }
+});
+
 // ── Automation rules CRUD ─────────────────────────────────────
-app.get('/api/admin/automations', async (_req, res) => {
+app.get('/api/admin/automations', requireRole(['admin']), async (_req, res) => {
   try { res.json({ automations: await getAutomations() }); }
   catch (e: any) { res.status(500).json({ error: e.message }); }
 });
 
-app.post('/api/admin/automations', async (req, res) => {
+app.post('/api/admin/automations', requireRole(['admin']), async (req, res) => {
   const { automations } = req.body;
   if (!Array.isArray(automations)) return res.status(400).json({ error: 'automations must be array' });
   try { await saveAutomations(automations); res.json({ success: true }); }
   catch (e: any) { res.status(500).json({ error: e.message }); }
 });
 
-app.post('/api/admin/automations/add', async (req, res) => {
+app.post('/api/admin/automations/add', requireRole(['admin']), async (req, res) => {
   const { trigger, recipientType, customPhone } = req.body;
   if (!trigger || !recipientType) return res.status(400).json({ error: 'Missing fields' });
   try {
@@ -1150,7 +1251,7 @@ app.post('/api/admin/automations/add', async (req, res) => {
   } catch (e: any) { res.status(500).json({ error: e.message || 'Server error' }); }
 });
 
-app.patch('/api/admin/automations/:id', async (req, res) => {
+app.patch('/api/admin/automations/:id', requireRole(['admin']), async (req, res) => {
   const { id } = req.params;
   try {
     const automations = await getAutomations();
@@ -1164,7 +1265,7 @@ app.patch('/api/admin/automations/:id', async (req, res) => {
   } catch (e: any) { res.status(500).json({ error: e.message || 'Server error' }); }
 });
 
-app.delete('/api/admin/automations/:id', async (req, res) => {
+app.delete('/api/admin/automations/:id', requireRole(['admin']), async (req, res) => {
   const { id } = req.params;
   try {
     const automations = await getAutomations();
@@ -1174,10 +1275,10 @@ app.delete('/api/admin/automations/:id', async (req, res) => {
 });
 
 // ── Notification templates ────────────────────────────────────
-app.get('/api/admin/notification-templates', async (_req, res) => {
+app.get('/api/admin/notification-templates', requireRole(['admin']), async (_req, res) => {
   res.json({ templates: await getTemplates() });
 });
-app.post('/api/admin/notification-templates', async (req, res) => {
+app.post('/api/admin/notification-templates', requireRole(['admin']), async (req, res) => {
   const { templates } = req.body;
   if (!templates) return res.status(400).json({ error: 'Missing templates' });
   try { await setSetting('notification_templates', templates); res.json({ success: true }); }
@@ -1214,7 +1315,7 @@ async function getDummyVars(event: EventKey, to: string): Promise<Record<string,
   return base;
 }
 
-app.post('/api/admin/test-notification', async (req, res) => {
+app.post('/api/admin/test-notification', requireRole(['admin']), async (req, res) => {
   const { event, testPhone } = req.body as { event: EventKey; testPhone?: string };
   if (!event) return res.status(400).json({ error: 'Missing event' });
   const to = testPhone || MANAGER_PHONE;
@@ -1230,7 +1331,7 @@ app.post('/api/admin/test-notification', async (req, res) => {
   } catch { res.status(500).json({ error: 'Failed' }); }
 });
 
-app.post('/api/admin/test-all-notifications', async (req, res) => {
+app.post('/api/admin/test-all-notifications', requireRole(['admin']), async (req, res) => {
   const { testPhone } = req.body as { testPhone?: string };
   const to = testPhone || MANAGER_PHONE;
   const events: EventKey[] = ['new_booking','booking_approved','driver_accepted','booking_rejected','captain_on_road','booking_completed'];
@@ -1256,7 +1357,7 @@ app.post('/api/admin/test-all-notifications', async (req, res) => {
 });
 
 // ── Full cycle simulation (all 5 transitions) ────────────────
-app.post('/api/admin/simulate-cycle', async (req, res) => {
+app.post('/api/admin/simulate-cycle', requireRole(['admin']), async (req, res) => {
   const { testPhone: rawPhone } = req.body;
   const customerPhone = rawPhone?.trim() ? normalizePhone(rawPhone.trim()) : MANAGER_PHONE;
   const steps: { label: string; ok: boolean }[] = [];
