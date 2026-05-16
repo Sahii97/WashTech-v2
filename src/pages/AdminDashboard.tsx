@@ -692,122 +692,61 @@ export default function AdminDashboard() {
                     </div>
 
                     {cfg.enabled && (
-                      <>
-                        {/* Automation recipients (إذن) */}
-                        <div className="mb-4 bg-slate-50 dark:bg-slate-700/40 rounded-xl p-3">
-                          <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2 flex items-center gap-1">
-                            <Zap size={11} className="text-green-500" />
-                            إذن: أرسل إلى
-                          </p>
-                          <div className="space-y-1.5">
-                            {eventRules.map(rule =>
-                              editingRuleId === rule.id ? (
-                                <RuleForm
-                                  key={rule.id}
-                                  initial={rule}
-                                  hideIf
-                                  vars={meta.vars}
-                                  onSave={data => saveEditRule(rule.id, data)}
-                                  onCancel={() => setEditingRuleId(null)}
-                                />
-                              ) : (
-                                <div key={rule.id} className={`flex items-center gap-2 rounded-lg px-3 py-2 transition-opacity ${rule.enabled ? '' : 'opacity-50'}`} style={{ background: 'rgba(0,0,0,0.03)' }}>
-                                  <span className="flex-1 text-sm font-medium text-slate-800 dark:text-slate-200">
-                                    {RECIPIENT_LABELS[rule.recipientType]}
-                                    {rule.customPhone && <span className="font-mono text-xs text-slate-400 mr-2" dir="ltr">{rule.customPhone}</span>}
-                                    {rule.template && <span className="mr-1.5 text-[10px] text-blue-500 font-semibold bg-blue-50 dark:bg-blue-950 px-1.5 py-0.5 rounded-md">رسالة مخصصة</span>}
-                                  </span>
-                                  <Toggle checked={rule.enabled} onChange={v => patchRule(rule.id, { enabled: v })} />
-                                  <button type="button" onClick={() => { setEditingRuleId(rule.id); setAddingRuleForEvent(null); }} className="p-1.5 text-slate-400 hover:text-blue-500 rounded-lg transition-colors"><Pencil size={12} /></button>
-                                  <button type="button" onClick={() => deleteRule(rule.id)} className="p-1.5 text-slate-400 hover:text-red-500 rounded-lg transition-colors"><Trash2 size={12} /></button>
-                                </div>
-                              )
-                            )}
-                            {eventRules.length === 0 && !isAddingForThis && (
-                              <p className="text-xs text-slate-400 dark:text-slate-500 py-0.5">لم تُضف أي مستلم — أضف واحداً أدناه</p>
-                            )}
-                            {isAddingForThis && (
+                      <div className="bg-slate-50 dark:bg-slate-700/40 rounded-xl p-3">
+                        <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2 flex items-center gap-1">
+                          <Zap size={11} className="text-green-500" />
+                          إذن: أرسل إلى
+                        </p>
+                        <div className="space-y-1.5">
+                          {eventRules.map(rule =>
+                            editingRuleId === rule.id ? (
                               <RuleForm
+                                key={rule.id}
+                                initial={rule}
                                 hideIf
-                                fixedTrigger={meta.key}
                                 vars={meta.vars}
-                                onSave={async data => { await addRule({ ...data, trigger: meta.key }); }}
-                                onCancel={() => setAddingRuleForEvent(null)}
+                                onSave={data => saveEditRule(rule.id, data)}
+                                onCancel={() => setEditingRuleId(null)}
                               />
-                            )}
-                          </div>
-                          {!isAddingForThis && (
-                            <button
-                              onClick={() => { setAddingRuleForEvent(meta.key); setEditingRuleId(null); }}
-                              className="mt-2 flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 dark:text-blue-400 font-semibold"
-                            >
-                              <Plus size={12} /> إضافة مستلم
-                            </button>
+                            ) : (
+                              <div key={rule.id} className={`flex items-center gap-2 rounded-lg px-3 py-2 transition-opacity ${rule.enabled ? '' : 'opacity-50'}`} style={{ background: 'rgba(0,0,0,0.03)' }}>
+                                <span className="flex-1 text-sm font-medium text-slate-800 dark:text-slate-200">
+                                  {RECIPIENT_LABELS[rule.recipientType]}
+                                  {rule.customPhone && <span className="font-mono text-xs text-slate-400 mr-2" dir="ltr">{rule.customPhone}</span>}
+                                  {rule.template
+                                    ? <span className="mr-1.5 text-[10px] text-blue-500 font-semibold bg-blue-50 dark:bg-blue-950 px-1.5 py-0.5 rounded-md">رسالة مخصصة</span>
+                                    : <span className="mr-1.5 text-[10px] text-amber-500 font-medium bg-amber-50 dark:bg-amber-950/40 px-1.5 py-0.5 rounded-md">بدون رسالة</span>
+                                  }
+                                </span>
+                                <Toggle checked={rule.enabled} onChange={v => patchRule(rule.id, { enabled: v })} />
+                                <button type="button" onClick={() => { setEditingRuleId(rule.id); setAddingRuleForEvent(null); }} className="p-1.5 text-slate-400 hover:text-blue-500 rounded-lg transition-colors" title="تعديل"><Pencil size={12} /></button>
+                                <button type="button" onClick={() => deleteRule(rule.id)} className="p-1.5 text-slate-400 hover:text-red-500 rounded-lg transition-colors" title="حذف"><Trash2 size={12} /></button>
+                              </div>
+                            )
+                          )}
+                          {eventRules.length === 0 && !isAddingForThis && (
+                            <p className="text-xs text-slate-400 dark:text-slate-500 py-0.5">لم تُضف أي مستلم — أضف واحداً أدناه</p>
+                          )}
+                          {isAddingForThis && (
+                            <RuleForm
+                              hideIf
+                              fixedTrigger={meta.key}
+                              vars={meta.vars}
+                              onSave={async data => { await addRule({ ...data, trigger: meta.key }); }}
+                              onCancel={() => setAddingRuleForEvent(null)}
+                            />
                           )}
                         </div>
-
-                        {/* Variable chips */}
-                        <div className="flex flex-wrap gap-1.5 mb-3">
-                          {meta.vars.map(v => (
-                            <button key={v} type="button" onClick={() => insertVar(meta.key, v)}
-                              className="px-2 py-1 bg-blue-50 dark:bg-blue-950 hover:bg-blue-100 dark:hover:bg-blue-900 text-blue-600 dark:text-blue-400 text-xs font-mono rounded-lg border border-blue-100 dark:border-blue-800 transition-colors">
-                              {v}
-                            </button>
-                          ))}
-                        </div>
-
-                        {/* WhatsApp preview (collapsible) */}
-                        {isPreviewOpen && (
-                          <div className="mb-3 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-600">
-                            <div className="bg-[#e5ddd5] dark:bg-[#0c1317] px-3 py-3">
-                              <p className="text-[10px] text-slate-500 dark:text-slate-400 mb-2 font-medium uppercase tracking-wide">معاينة الرسالة</p>
-                              <MessageCard from="WashTech" body={renderPreview(cfg.template) || '...'} time={now} compact={false} />
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Message textarea */}
-                        <div className="bg-[#f0f2f5] dark:bg-slate-900/50 flex items-end gap-2 px-3 py-2 rounded-2xl border border-slate-200 dark:border-slate-600 mb-3">
-                          <textarea
-                            ref={el => { textareaRefs.current[meta.key] = el; }}
-                            value={cfg.template}
-                            onChange={e => setTemplates(p => ({ ...p, [meta.key]: { ...p[meta.key], template: e.target.value } }))}
-                            rows={4}
-                            dir="auto"
-                            placeholder="نص الرسالة... استخدم {{المتغير}} لبيانات ديناميكية"
-                            className="flex-1 bg-white dark:bg-slate-700 border-0 rounded-xl text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 px-3 py-2.5 resize-none focus:outline-none focus:ring-2 focus:ring-blue-400/30 font-mono"
-                          />
-                          <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center flex-shrink-0 mb-0.5">
-                            <Send size={14} strokeWidth={2} className="text-white" />
-                          </div>
-                        </div>
-
-                        {/* Action buttons */}
-                        <div className="flex gap-2 flex-wrap">
+                        {!isAddingForThis && (
                           <button
-                            onClick={() => setShowPreview(p => ({ ...p, [meta.key]: !p[meta.key] }))}
-                            className={`px-3 py-2 text-sm font-semibold rounded-xl transition-colors border flex items-center gap-1.5 ${isPreviewOpen ? 'bg-green-50 border-green-200 text-green-700 dark:bg-green-950 dark:border-green-800 dark:text-green-400' : 'border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:border-slate-300'}`}
+                            type="button"
+                            onClick={() => { setAddingRuleForEvent(meta.key); setEditingRuleId(null); }}
+                            className="mt-2 flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 dark:text-blue-400 font-semibold"
                           >
-                            <Bell size={13} />
-                            {isPreviewOpen ? 'إخفاء المعاينة' : 'معاينة واتساب'}
+                            <Plus size={12} /> إضافة مستلم
                           </button>
-                          <button onClick={() => saveTemplate(meta.key)} disabled={!!saving[meta.key]}
-                            className={`flex-1 py-2 rounded-xl font-semibold text-sm transition-all flex items-center justify-center gap-1.5 ${saved[meta.key] ? 'bg-green-500 text-white' : 'bg-blue-600 hover:bg-blue-700 text-white'} disabled:opacity-50`}>
-                            <Save size={13} />
-                            {saving[meta.key] ? '...' : saved[meta.key] ? '✓ تم الحفظ' : 'حفظ'}
-                          </button>
-                          <button onClick={() => testEvent(meta.key)} disabled={!!testing[meta.key]}
-                            className="px-4 py-2 bg-slate-800 dark:bg-slate-700 hover:bg-slate-700 dark:hover:bg-slate-600 disabled:opacity-50 text-white rounded-xl text-sm transition-colors flex items-center gap-1.5">
-                            <Play size={12} />
-                            {testing[meta.key] ? '...' : 'اختبار'}
-                          </button>
-                        </div>
-                        {testResult[meta.key] && (
-                          <p className={`text-xs mt-1.5 font-mono ${testResult[meta.key]!.startsWith('✓') ? 'text-green-600' : 'text-red-500'}`}>
-                            {testResult[meta.key]}
-                          </p>
                         )}
-                      </>
+                      </div>
                     )}
                   </div>
                 );
