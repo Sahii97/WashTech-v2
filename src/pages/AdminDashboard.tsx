@@ -294,7 +294,7 @@ export default function AdminDashboard() {
 
   // Dynamic settings state
   const [finConfig,      setFinConfig]      = useState({ captainSharePct: 70, basic: 15000, standard: 25000, premium: 35000, basicName: 'أساسي', standardName: 'قياسي', premiumName: 'ممتاز', basicDesc: '', standardDesc: '', premiumDesc: '' });
-  const [appConfig,      setAppConfig]      = useState({ appName: 'WashTech', tagline: 'خدمة غسيل سيارات احترافية', supportPhone: '', managerPhone: '', automationEnabled: true });
+  const [appConfig,      setAppConfig]      = useState({ appName: 'WashTech', tagline: 'خدمة غسيل سيارات احترافية', supportPhone: '', managerPhone: '', automationEnabled: true, wasenderToken: '' });
   const [settingsSaved,  setSettingsSaved]  = useState('');
   const [settingsLoading,setSettingsLoading]= useState(false);
 
@@ -988,6 +988,18 @@ export default function AdminDashboard() {
                   <div>
                     <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5">رقم الدعم (واتساب)</label>
                     <input value={appConfig.supportPhone} onChange={e => setAppConfig(p => ({ ...p, supportPhone: e.target.value }))} className={inp} placeholder="+9647XXXXXXXXX" dir="ltr" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">رمز Wasender API Token</label>
+                    <p className="text-xs text-slate-400 dark:text-slate-500 mb-1.5">من لوحة Wasender → الجلسة → انسخ الـ Token والصقه هنا</p>
+                    <input
+                      value={appConfig.wasenderToken || ''}
+                      onChange={e => setAppConfig(p => ({ ...p, wasenderToken: e.target.value }))}
+                      className={inp + ' font-mono text-xs'}
+                      placeholder="ws_xxxxxxxxxxxxxxxx"
+                      dir="ltr"
+                      type="password"
+                    />
                   </div>
                   <button onClick={saveAppConfig} disabled={settingsLoading} className={`w-full py-2.5 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${settingsSaved === 'app' ? 'bg-green-500 text-white' : 'bg-blue-600 hover:bg-blue-700 text-white'} disabled:opacity-50`}>
                     <Save size={14} />{settingsSaved === 'app' ? '✓ تم الحفظ' : 'حفظ إعدادات التطبيق'}

@@ -274,12 +274,22 @@ function normalizePhone(phone: string): string {
 }
 
 // ── WhatsApp sender ───────────────────────────────────────────
+async function getWasenderToken(): Promise<string> {
+  try {
+    const cfg = await getSetting<any>('app_config', {});
+    return cfg.wasenderToken || WASENDER_TOKEN;
+  } catch {
+    return WASENDER_TOKEN;
+  }
+}
+
 async function sendWhatsApp(to: string, text: string): Promise<void> {
-  if (!WASENDER_TOKEN) { console.warn('[WhatsApp] No WASENDER_API_TOKEN'); return; }
+  const token = await getWasenderToken();
+  if (!token) { console.warn('[WhatsApp] No token configured'); return; }
   try {
     const res = await fetch('https://wasenderapi.com/api/send-message', {
       method: 'POST',
-      headers: { 'Authorization': `Bearer ${WASENDER_TOKEN}`, 'Content-Type': 'application/json' },
+      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ to: normalizePhone(to), text }),
     });
     if (!res.ok) console.error('[WhatsApp]', res.status, await res.text());
