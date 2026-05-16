@@ -293,7 +293,7 @@ export default function AdminDashboard() {
 
 
   // Dynamic settings state
-  const [finConfig,      setFinConfig]      = useState({ captainSharePct: 70, basic: 15000, standard: 25000, premium: 35000, basicName: 'أساسي', standardName: 'قياسي', premiumName: 'ممتاز', basicDesc: '', standardDesc: '', premiumDesc: '' });
+  const [finConfig,      setFinConfig]      = useState({ captainSharePct: 70, basic: 15000, standard: 25000, premium: 35000, basicName: 'أساسي', standardName: 'قياسي', premiumName: 'ممتاز', basicName_ku: '', standardName_ku: '', premiumName_ku: '', basicDesc_ar: '', standardDesc_ar: '', premiumDesc_ar: '', basicDesc_ku: '', standardDesc_ku: '', premiumDesc_ku: '' });
   const [appConfig,      setAppConfig]      = useState({ appName: 'WashTech', tagline: 'خدمة غسيل سيارات احترافية', supportPhone: '', managerPhone: '', automationEnabled: true, wasenderToken: '' });
   const [settingsSaved,  setSettingsSaved]  = useState('');
   const [settingsLoading,setSettingsLoading]= useState(false);
@@ -355,11 +355,18 @@ export default function AdminDashboard() {
       ]);
       if (fc?.value) {
         const v = fc.value;
+        const d = v.packageDescriptions || {};
         setFinConfig({
           captainSharePct: Math.round((v.captainSharePct || 0.70) * 100),
           basic: v.packagePrices?.basic || 15000, standard: v.packagePrices?.standard || 25000, premium: v.packagePrices?.premium || 35000,
           basicName: v.packageNames?.basic || 'أساسي', standardName: v.packageNames?.standard || 'قياسي', premiumName: v.packageNames?.premium || 'ممتاز',
-          basicDesc: v.packageDescriptions?.basic || '', standardDesc: v.packageDescriptions?.standard || '', premiumDesc: v.packageDescriptions?.premium || '',
+          basicName_ku: v.packageNames?.basic_ku || '', standardName_ku: v.packageNames?.standard_ku || '', premiumName_ku: v.packageNames?.premium_ku || '',
+          basicDesc_ar:  (typeof d.basic    === 'object' ? d.basic?.ar    : d.basic)    || '',
+          standardDesc_ar: (typeof d.standard === 'object' ? d.standard?.ar : d.standard) || '',
+          premiumDesc_ar:  (typeof d.premium  === 'object' ? d.premium?.ar  : d.premium)  || '',
+          basicDesc_ku:  d.basic?.ku    || '',
+          standardDesc_ku: d.standard?.ku || '',
+          premiumDesc_ku:  d.premium?.ku  || '',
         });
       }
       if (ac?.value) setAppConfig(prev => ({ ...prev, ...ac.value }));
@@ -407,8 +414,12 @@ export default function AdminDashboard() {
     const value = {
       captainSharePct: finConfig.captainSharePct / 100,
       packagePrices: { basic: finConfig.basic, standard: finConfig.standard, premium: finConfig.premium },
-      packageNames: { basic: finConfig.basicName, standard: finConfig.standardName, premium: finConfig.premiumName },
-      packageDescriptions: { basic: finConfig.basicDesc, standard: finConfig.standardDesc, premium: finConfig.premiumDesc },
+      packageNames: { basic: finConfig.basicName, standard: finConfig.standardName, premium: finConfig.premiumName, basic_ku: finConfig.basicName_ku, standard_ku: finConfig.standardName_ku, premium_ku: finConfig.premiumName_ku },
+      packageDescriptions: {
+        basic:    { ar: finConfig.basicDesc_ar,    ku: finConfig.basicDesc_ku },
+        standard: { ar: finConfig.standardDesc_ar, ku: finConfig.standardDesc_ku },
+        premium:  { ar: finConfig.premiumDesc_ar,  ku: finConfig.premiumDesc_ku },
+      },
     };
     await fetch('/api/admin/settings/finance_config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ value }) });
     setSettingsSaved('finance'); setSettingsLoading(false);
@@ -963,6 +974,39 @@ export default function AdminDashboard() {
                 />
               </div>
 
+              {/* WhatsApp settings */}
+              <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-5">
+                <div className="flex items-center gap-2 mb-4">
+                  <Smartphone size={16} className="text-green-500" />
+                  <h3 className="font-bold text-slate-900 dark:text-white text-sm">إعدادات واتساب</h3>
+                </div>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">رقم المدير — يستقبل إشعارات الحجوزات</label>
+                    <p className="text-xs text-slate-400 dark:text-slate-500 mb-1.5">الرقم الذي سيصله إشعار كل حجز جديد</p>
+                    <div className="flex items-center gap-2">
+                      <span className="text-slate-400 text-sm">📲</span>
+                      <input value={appConfig.managerPhone || ''} onChange={e => setAppConfig(p => ({ ...p, managerPhone: e.target.value }))} className={inp} placeholder="+9647XXXXXXXXX" dir="ltr" />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">رمز Wasender — الرقم الذي يُرسل الرسائل</label>
+                    <p className="text-xs text-slate-400 dark:text-slate-500 mb-1.5">من لوحة Wasender ← الجلسة ← انسخ الـ API Token والصقه هنا</p>
+                    <input
+                      value={appConfig.wasenderToken || ''}
+                      onChange={e => setAppConfig(p => ({ ...p, wasenderToken: e.target.value }))}
+                      className={inp + ' font-mono text-xs'}
+                      placeholder="ws_xxxxxxxxxxxxxxxx"
+                      dir="ltr"
+                      type="password"
+                    />
+                  </div>
+                  <button onClick={saveAppConfig} disabled={settingsLoading} className={`w-full py-2.5 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${settingsSaved === 'app' ? 'bg-green-500 text-white' : 'bg-blue-600 hover:bg-blue-700 text-white'} disabled:opacity-50`}>
+                    <Save size={14} />{settingsSaved === 'app' ? '✓ تم الحفظ' : 'حفظ إعدادات واتساب'}
+                  </button>
+                </div>
+              </div>
+
               {/* App config */}
               <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-5">
                 <div className="flex items-center gap-2 mb-4">
@@ -979,27 +1023,8 @@ export default function AdminDashboard() {
                     <input value={appConfig.tagline} onChange={e => setAppConfig(p => ({ ...p, tagline: e.target.value }))} className={inp} placeholder="خدمة غسيل سيارات..." />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5">رقم واتساب المدير (يستقبل إشعارات الحجوزات)</label>
-                    <div className="flex items-center gap-2">
-                      <Smartphone size={16} className="text-slate-400 flex-shrink-0" />
-                      <input value={appConfig.managerPhone || ''} onChange={e => setAppConfig(p => ({ ...p, managerPhone: e.target.value }))} className={inp} placeholder="+9647XXXXXXXXX" dir="ltr" />
-                    </div>
-                  </div>
-                  <div>
                     <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5">رقم الدعم (واتساب)</label>
                     <input value={appConfig.supportPhone} onChange={e => setAppConfig(p => ({ ...p, supportPhone: e.target.value }))} className={inp} placeholder="+9647XXXXXXXXX" dir="ltr" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">رمز Wasender API Token</label>
-                    <p className="text-xs text-slate-400 dark:text-slate-500 mb-1.5">من لوحة Wasender → الجلسة → انسخ الـ Token والصقه هنا</p>
-                    <input
-                      value={appConfig.wasenderToken || ''}
-                      onChange={e => setAppConfig(p => ({ ...p, wasenderToken: e.target.value }))}
-                      className={inp + ' font-mono text-xs'}
-                      placeholder="ws_xxxxxxxxxxxxxxxx"
-                      dir="ltr"
-                      type="password"
-                    />
                   </div>
                   <button onClick={saveAppConfig} disabled={settingsLoading} className={`w-full py-2.5 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${settingsSaved === 'app' ? 'bg-green-500 text-white' : 'bg-blue-600 hover:bg-blue-700 text-white'} disabled:opacity-50`}>
                     <Save size={14} />{settingsSaved === 'app' ? '✓ تم الحفظ' : 'حفظ إعدادات التطبيق'}
@@ -1015,34 +1040,31 @@ export default function AdminDashboard() {
                 </div>
                 <div className="space-y-4">
                   {(['basic', 'standard', 'premium'] as const).map(pkg => {
-                    const nameKey = `${pkg}Name` as keyof typeof finConfig;
-                    const descKey = `${pkg}Desc` as keyof typeof finConfig;
                     const labels = { basic: 'الباقة الأساسية', standard: 'الباقة القياسية', premium: 'الباقة المميزة' };
+                    const nameKey    = `${pkg}Name`    as keyof typeof finConfig;
+                    const nameKuKey  = `${pkg}Name_ku` as keyof typeof finConfig;
+                    const descArKey  = `${pkg}Desc_ar` as keyof typeof finConfig;
+                    const descKuKey  = `${pkg}Desc_ku` as keyof typeof finConfig;
                     return (
-                      <div key={pkg} className="border border-slate-100 dark:border-slate-700 rounded-xl p-3 space-y-2">
+                      <div key={pkg} className="border border-slate-100 dark:border-slate-700 rounded-xl p-3 space-y-2.5">
                         <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">{labels[pkg]}</p>
+                        {/* Price */}
                         <div className="flex gap-2">
-                          <input
-                            value={String(finConfig[nameKey] || '')}
-                            onChange={e => setFinConfig(p => ({ ...p, [nameKey]: e.target.value }))}
-                            className={inp + ' flex-1'}
-                            placeholder="اسم الباقة"
-                          />
-                          <input
-                            type="number"
-                            value={finConfig[pkg]}
-                            onChange={e => setFinConfig(p => ({ ...p, [pkg]: Number(e.target.value) }))}
-                            className={inp + ' w-32 font-mono'}
-                            dir="ltr"
-                            placeholder="السعر"
-                          />
+                          <input type="number" value={finConfig[pkg]} onChange={e => setFinConfig(p => ({ ...p, [pkg]: Number(e.target.value) }))} className={inp + ' w-36 font-mono'} dir="ltr" placeholder="السعر (د.ع)" />
+                          <span className="self-center text-xs text-slate-400">د.ع</span>
                         </div>
-                        <input
-                          value={String(finConfig[descKey] || '')}
-                          onChange={e => setFinConfig(p => ({ ...p, [descKey]: e.target.value }))}
-                          className={inp}
-                          placeholder="وصف الباقة (اختياري)"
-                        />
+                        {/* Arabic name + description */}
+                        <div className="space-y-1.5">
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide flex items-center gap-1">🇮🇶 عربي</p>
+                          <input value={String(finConfig[nameKey] || '')} onChange={e => setFinConfig(p => ({ ...p, [nameKey]: e.target.value }))} className={inp} placeholder="اسم الباقة بالعربي" />
+                          <input value={String(finConfig[descArKey] || '')} onChange={e => setFinConfig(p => ({ ...p, [descArKey]: e.target.value }))} className={inp} placeholder="وصف الباقة بالعربي (اختياري)" />
+                        </div>
+                        {/* Kurdish name + description */}
+                        <div className="space-y-1.5">
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide flex items-center gap-1">🟡 کوردی</p>
+                          <input value={String(finConfig[nameKuKey] || '')} onChange={e => setFinConfig(p => ({ ...p, [nameKuKey]: e.target.value }))} className={inp} placeholder="ناوی پاکێج بە کوردی" dir="rtl" />
+                          <input value={String(finConfig[descKuKey] || '')} onChange={e => setFinConfig(p => ({ ...p, [descKuKey]: e.target.value }))} className={inp} placeholder="وەسفی پاکێج بە کوردی (ئارەزووی)" dir="rtl" />
+                        </div>
                       </div>
                     );
                   })}

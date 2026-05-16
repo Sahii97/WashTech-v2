@@ -17,7 +17,7 @@ export default function BookingPage() {
   const [errorMsg, setErrorMsg] = useState('');
   const [slots, setSlots] = useState<string[]>([]);
   const [neighborhoods, setNeighborhoods] = useState<string[]>([]);
-  const [pkgData, setPkgData] = useState<Record<string, { name: string; desc: string; price: number }>>({});
+  const [pkgData, setPkgData] = useState<Record<string, { name: string; name_ku: string; desc_ar: string; desc_ku: string; price: number }>>({});
 
   const [gpsLoading, setGpsLoading] = useState(false);
   const [gpsError, setGpsError] = useState('');
@@ -258,8 +258,8 @@ export default function BookingPage() {
                 <div className="space-y-2">
                   {Object.entries(tr.packages).map(([k, v]) => {
                     const pkg = pkgData[k];
-                    const displayName = pkg?.name || v;
-                    const desc = pkg?.desc;
+                    const displayName = lang === 'ku' ? (pkg?.name_ku || v) : (pkg?.name || v);
+                    const desc = lang === 'ku' ? pkg?.desc_ku : pkg?.desc_ar;
                     return (
                       <button
                         key={k}

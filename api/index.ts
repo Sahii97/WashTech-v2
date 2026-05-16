@@ -378,14 +378,26 @@ app.get('/go/:code', async (req, res) => {
 app.get('/api/packages', async (_req, res) => {
   try {
     const finCfg = await getSetting<any>('finance_config', {});
-    const names = finCfg.packageNames || {};
-    const descs = finCfg.packageDescriptions || {};
+    const names  = finCfg.packageNames  || {};
+    const descs  = finCfg.packageDescriptions || {};
     const prices = finCfg.packagePrices || {};
+    function getDesc(d: any, lang: 'ar' | 'ku'): string {
+      if (!d) return '';
+      if (typeof d === 'object') return d[lang] || '';
+      return lang === 'ar' ? String(d) : ''; // legacy single string was Arabic
+    }
+    const build = (key: string, defName: string, defPrice: number) => ({
+      name:     names[key]             || defName,
+      name_ku:  names[`${key}_ku`]     || '',
+      desc_ar:  getDesc(descs[key], 'ar'),
+      desc_ku:  getDesc(descs[key], 'ku'),
+      price:    prices[key]            || defPrice,
+    });
     res.json({
       packages: {
-        basic:    { name: names.basic    || 'أساسي',  desc: descs.basic    || '', price: prices.basic    || 15000 },
-        standard: { name: names.standard || 'قياسي',  desc: descs.standard || '', price: prices.standard || 25000 },
-        premium:  { name: names.premium  || 'ممتاز',  desc: descs.premium  || '', price: prices.premium  || 35000 },
+        basic:    build('basic',    'أساسي', 15000),
+        standard: build('standard', 'قياسي', 25000),
+        premium:  build('premium',  'ممتاز', 35000),
       }
     });
   } catch { res.json({ packages: {} }); }
