@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import crypto from 'crypto';
 import express from 'express';
 import { initializeApp as adminInit, getApps as adminGetApps, cert, App } from 'firebase-admin/app';
 import { getFirestore as adminGetFirestore } from 'firebase-admin/firestore';
@@ -373,13 +374,41 @@ app.post('/api/admin/login', async (req, res) => {
   if (!password) return res.status(400).json({ error: 'كلمة المرور مطلوبة' });
   try {
     const cfg = await getSetting<any>('app_config', {});
-    const adminPwd = cfg.adminPassword || process.env.ADMIN_PASSWORD || 'admin1234';
+    const adminPwd = cfg.adminPassword || process.env.ADMIN_PASSWORD || 'admin';
     if (password === adminPwd) res.json({ success: true });
     else res.status(401).json({ error: 'كلمة المرور غير صحيحة' });
   } catch (e) { res.status(500).json({ error: 'خطأ في الخادم' }); }
 });
 
 
+
+// ── Magic-link token auth ──────────────────────────────────────
+app.get('/api/auth/manager', async (req, res) => {
+  const { token } = req.query as { token?: string };
+  if (!token) return res.status(400).json({ error: 'token required' });
+  const managers = await getManagers();
+  const mgr = (managers as any[]).find(m => m.token === token);
+  if (mgr) res.json({ success: true, manager: { id: mgr.id, name: mgr.name } });
+  else res.status(401).json({ error: 'رابط غير صالح أو منتهي' });
+});
+
+app.get('/api/auth/captain', async (req, res) => {
+  const { token } = req.query as { token?: string };
+  if (!token) return res.status(400).json({ error: 'token required' });
+  const captains = await getCaptains();
+  const cpt = (captains as any[]).find(c => c.token === token);
+  if (cpt) res.json({ success: true, captain: { id: cpt.id, name: cpt.name } });
+  else res.status(401).json({ error: 'رابط غير صالح أو منتهي' });
+});
+
+app.post('/api/admin/generate-token', async (req, res) => {
+  const { role, id } = req.body || {};
+  if (!role || !id) return res.status(400).json({ error: 'role and id required' });
+  const token = crypto.randomBytes(20).toString('hex');
+  const collName = role === 'captain' ? 'drivers' : 'managers';
+  await updateDoc(doc(db, collName, id), { token });
+  res.json({ success: true, token });
+});
 
 app.get('/api/health', (_req, res) => {
   res.json({

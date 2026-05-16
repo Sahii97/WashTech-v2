@@ -13,8 +13,8 @@ function timeAgo(iso: string): string {
 const BUILD_COUNT = typeof __COMMIT_COUNT__ !== 'undefined' ? __COMMIT_COUNT__ : '0';
 const BUILD_TIME  = typeof __BUILD_TIME__   !== 'undefined' ? __BUILD_TIME__   : new Date().toISOString();
 
-type Driver       = { id: string; name: string; code: string; phone?: string };
-type Manager      = { id: string; name: string; username: string };
+type Driver       = { id: string; name: string; code: string; phone?: string; token?: string };
+type Manager      = { id: string; name: string; username: string; token?: string };
 type EventKey     = 'new_booking' | 'booking_approved' | 'driver_accepted' | 'booking_rejected' | 'captain_on_road' | 'booking_completed';
 type RecipientType = 'manager' | 'captain' | 'customer' | 'custom';
 type Section      = 'workflow' | 'drivers' | 'managers' | 'settings';
@@ -493,6 +493,18 @@ export default function AdminDashboard() {
   }
   async function deleteManager(id: string) { await fetch(`/api/admin/manager/${id}`, { method: 'DELETE' }); loadAll(); }
 
+  async function generateToken(role: 'captain' | 'manager', id: string) {
+    await fetch('/api/admin/generate-token', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ role, id }),
+    });
+    loadAll();
+  }
+
+  function copyLink(url: string) {
+    navigator.clipboard.writeText(url).catch(() => {});
+  }
+
   async function addNeighborhood(e: React.FormEvent) {
     e.preventDefault();
     const res = await fetch('/api/admin/neighborhoods', {
@@ -831,17 +843,33 @@ export default function AdminDashboard() {
                 {driverMsg && <p className={`text-sm mt-2 ${driverMsg === 'تمت الإضافة' ? 'text-green-600' : 'text-red-500'}`}>{driverMsg}</p>}
               </div>
               <div className="space-y-2">
-                {drivers.map(d => (
-                  <div key={d.id} className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 px-4 py-3 flex items-center justify-between">
-                    <div>
-                      <p className="font-semibold text-slate-900 dark:text-white text-sm">{d.name}</p>
-                      <p className="text-xs text-slate-400 dark:text-slate-500 font-mono mt-0.5">كود: {d.code}{d.phone ? ` · ${d.phone}` : ''}</p>
+                {drivers.map(d => {
+                  const link = d.token ? `${window.location.origin}/captain?token=${d.token}` : null;
+                  return (
+                    <div key={d.id} className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 px-4 py-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-semibold text-slate-900 dark:text-white text-sm">{d.name}</p>
+                          <p className="text-xs text-slate-400 dark:text-slate-500 font-mono mt-0.5">كود: {d.code}{d.phone ? ` · ${d.phone}` : ''}</p>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <button onClick={() => generateToken('captain', d.id)} className="px-2.5 py-1.5 text-xs font-semibold text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950 rounded-lg transition-colors">
+                            {d.token ? 'تجديد' : 'رابط'}
+                          </button>
+                          <button onClick={() => deleteDriver(d.id)} className="p-2 text-slate-300 hover:text-red-500 transition-colors">
+                            <Trash2 size={16} strokeWidth={1.5} />
+                          </button>
+                        </div>
+                      </div>
+                      {link && (
+                        <div className="mt-2 flex items-center gap-2 bg-slate-50 dark:bg-slate-900 rounded-xl px-3 py-2">
+                          <p className="text-xs text-slate-500 dark:text-slate-400 font-mono truncate flex-1 dir-ltr" dir="ltr">{link}</p>
+                          <button onClick={() => copyLink(link)} className="text-xs font-semibold text-blue-600 hover:text-blue-700 shrink-0">نسخ</button>
+                        </div>
+                      )}
                     </div>
-                    <button onClick={() => deleteDriver(d.id)} className="p-2 text-slate-300 hover:text-red-500 transition-colors">
-                      <Trash2 size={16} strokeWidth={1.5} />
-                    </button>
-                  </div>
-                ))}
+                  );
+                })}
                 {drivers.length === 0 && <p className="text-slate-400 dark:text-slate-500 text-sm text-center py-6">لا يوجد كباتن بعد</p>}
               </div>
             </div>
@@ -869,17 +897,33 @@ export default function AdminDashboard() {
                 {managerMsg && <p className={`text-sm mt-2 ${managerMsg === 'تمت الإضافة' ? 'text-green-600' : 'text-red-500'}`}>{managerMsg}</p>}
               </div>
               <div className="space-y-2">
-                {managers.map(m => (
-                  <div key={m.id} className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 px-4 py-3 flex items-center justify-between">
-                    <div>
-                      <p className="font-semibold text-slate-900 dark:text-white text-sm">{m.name}</p>
-                      <p className="text-xs text-slate-400 dark:text-slate-500 font-mono mt-0.5">@{m.username}</p>
+                {managers.map(m => {
+                  const link = m.token ? `${window.location.origin}/manager?token=${m.token}` : null;
+                  return (
+                    <div key={m.id} className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 px-4 py-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-semibold text-slate-900 dark:text-white text-sm">{m.name}</p>
+                          <p className="text-xs text-slate-400 dark:text-slate-500 font-mono mt-0.5">@{m.username}</p>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <button onClick={() => generateToken('manager', m.id)} className="px-2.5 py-1.5 text-xs font-semibold text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950 rounded-lg transition-colors">
+                            {m.token ? 'تجديد' : 'رابط'}
+                          </button>
+                          <button onClick={() => deleteManager(m.id)} className="p-2 text-slate-300 hover:text-red-500 transition-colors">
+                            <Trash2 size={16} strokeWidth={1.5} />
+                          </button>
+                        </div>
+                      </div>
+                      {link && (
+                        <div className="mt-2 flex items-center gap-2 bg-slate-50 dark:bg-slate-900 rounded-xl px-3 py-2">
+                          <p className="text-xs text-slate-500 dark:text-slate-400 font-mono truncate flex-1" dir="ltr">{link}</p>
+                          <button onClick={() => copyLink(link)} className="text-xs font-semibold text-blue-600 hover:text-blue-700 shrink-0">نسخ</button>
+                        </div>
+                      )}
                     </div>
-                    <button onClick={() => deleteManager(m.id)} className="p-2 text-slate-300 hover:text-red-500 transition-colors">
-                      <Trash2 size={16} strokeWidth={1.5} />
-                    </button>
-                  </div>
-                ))}
+                  );
+                })}
                 {managers.length === 0 && <p className="text-slate-400 dark:text-slate-500 text-sm text-center py-6">لا يوجد مدراء بعد</p>}
               </div>
             </div>
@@ -1043,7 +1087,7 @@ export default function AdminDashboard() {
                   </div>
                   <div>
                     <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">كلمة مرور لوحة التحكم</label>
-                    <p className="text-xs text-slate-400 dark:text-slate-500 mb-1.5">الافتراضية: admin1234 — غيّرها فوراً</p>
+                    <p className="text-xs text-slate-400 dark:text-slate-500 mb-1.5">الافتراضية: admin — غيّرها فوراً</p>
                     <input
                       value={appConfig.adminPassword || ''}
                       onChange={e => setAppConfig(p => ({ ...p, adminPassword: e.target.value }))}

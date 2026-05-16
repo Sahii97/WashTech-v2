@@ -65,6 +65,23 @@ export default function CaptainView() {
   const [actionError,  setActionError]  = useState<string | null>(null);
   const [pkgPrices,    setPkgPrices]    = useState<Record<string, number>>(DEFAULT_PRICES);
 
+  // Magic-link auto-login: /captain?token=xxx
+  useEffect(() => {
+    const token = new URLSearchParams(window.location.search).get('token');
+    if (!token) return;
+    fetch(`/api/auth/captain?token=${encodeURIComponent(token)}`)
+      .then(r => r.json())
+      .then(d => {
+        if (d.success) {
+          localStorage.setItem('wt_cpt', JSON.stringify(d.captain));
+          setCaptain(d.captain);
+          loadTasks(d.captain.id);
+          window.history.replaceState({}, '', '/captain');
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   useEffect(() => {
     if (captain) loadTasks(captain.id);
     fetch('/api/admin/settings/finance_config')

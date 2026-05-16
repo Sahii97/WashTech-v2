@@ -19,7 +19,7 @@ export function useDark() {
 
 function DevNav() {
   const params = new URLSearchParams(window.location.search);
-  if (params.get('superadmin') === 'false') return null;
+  if (!params.has('dev')) return null;
   const [dark, setDark] = useDark();
   return (
     <nav dir="rtl" className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 px-4 py-2 flex items-center gap-1 text-sm sticky top-0 z-50 shadow-sm">

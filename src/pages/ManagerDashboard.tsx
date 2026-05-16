@@ -81,6 +81,23 @@ export default function ManagerDashboard() {
 
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // Magic-link auto-login: /manager?token=xxx
+  useEffect(() => {
+    const token = new URLSearchParams(window.location.search).get('token');
+    if (!token) return;
+    fetch(`/api/auth/manager?token=${encodeURIComponent(token)}`)
+      .then(r => r.json())
+      .then(d => {
+        if (d.success) {
+          const data = { id: d.manager.id, name: d.manager.name };
+          localStorage.setItem('wt_mgr', JSON.stringify(data));
+          setAuth(data);
+          window.history.replaceState({}, '', '/manager');
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   useEffect(() => {
     load();
     intervalRef.current = setInterval(() => load(), 10000);
