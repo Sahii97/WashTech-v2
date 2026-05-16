@@ -11,28 +11,62 @@ type Captain = { id: string; name: string; code: string; phone?: string };
 
 const DEFAULT_PRICES: Record<string, number> = { basic: 15000, standard: 25000, premium: 35000, 'أساسي': 15000, 'قياسي': 25000, 'ممتاز': 35000 };
 
+function CaptainLogin({ onLogin }: { onLogin: (c: Captain) => void }) {
+  const [code, setCode] = useState('');
+  const [err, setErr]   = useState('');
+  const [loading, setLoading] = useState(false);
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setErr(''); setLoading(true);
+    const res = await fetch('/api/captain/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code }) });
+    const d = await res.json();
+    setLoading(false);
+    if (res.ok) {
+      localStorage.setItem('wt_cpt', JSON.stringify(d.captain));
+      onLogin(d.captain);
+    } else setErr(d.error || 'الكود غير صحيح');
+  }
+  return (
+    <div dir="rtl" className="min-h-[100dvh] bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-4">
+      <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm p-8 max-w-sm w-full">
+        <div className="mb-6"><WashTechLogo size={32} /></div>
+        <h1 className="text-lg font-bold text-slate-900 dark:text-white mb-1">بوابة الكابتن</h1>
+        <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">أدخل كودك الرباعي للدخول</p>
+        <form onSubmit={submit} className="space-y-3">
+          <input
+            value={code}
+            onChange={e => setCode(e.target.value.replace(/\D/g, '').slice(0, 4))}
+            placeholder="0000"
+            maxLength={4}
+            dir="ltr"
+            inputMode="numeric"
+            className="w-full px-3 py-4 border border-slate-200 dark:border-slate-600 rounded-xl text-3xl font-bold text-center tracking-[0.5em] focus:outline-none focus:ring-2 focus:ring-blue-500/30 bg-white dark:bg-slate-700 dark:text-white"
+          />
+          {err && <p className="text-xs text-red-500 text-center">{err}</p>}
+          <button type="submit" disabled={loading || code.length < 4}
+            className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white font-bold text-sm rounded-xl transition-colors">
+            {loading ? '...' : 'دخول'}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 export default function CaptainView() {
-  const [allCaptains,  setAllCaptains]  = useState<Captain[]>([]);
-  const [captain,      setCaptain]      = useState<Captain | null>(null);
+  const [captain, setCaptain] = useState<Captain | null>(() => {
+    try { return JSON.parse(localStorage.getItem('wt_cpt') || 'null'); } catch { return null; }
+  });
   const [tasks,        setTasks]        = useState<Task[]>([]);
   const [recentDone,   setRecentDone]   = useState<Task[]>([]);
   const [loading,      setLoading]      = useState(false);
-  const [captainsLoading, setCaptainsLoading] = useState(true);
   const [confirmId,    setConfirmId]    = useState<string | null>(null);
   const [tab,          setTab]          = useState<'active' | 'done'>('active');
   const [actionError,  setActionError]  = useState<string | null>(null);
   const [pkgPrices,    setPkgPrices]    = useState<Record<string, number>>(DEFAULT_PRICES);
 
   useEffect(() => {
-    fetch('/api/drivers')
-      .then(r => r.json())
-      .then(d => {
-        const list: Captain[] = d.drivers || [];
-        setAllCaptains(list);
-        setCaptainsLoading(false);
-        if (list.length === 1) selectCaptain(list[0]);
-      })
-      .catch(() => setCaptainsLoading(false));
+    if (captain) loadTasks(captain.id);
     fetch('/api/admin/settings/finance_config')
       .then(r => r.json())
       .then(d => {
@@ -47,11 +81,6 @@ export default function CaptainView() {
 
   function fmtPrice(n: number): string {
     return n > 0 ? n.toLocaleString('ar-IQ') + ' د.ع' : '—';
-  }
-
-  async function selectCaptain(c: Captain) {
-    setCaptain(c);
-    loadTasks(c.id);
   }
 
   async function loadTasks(captainId: string) {
@@ -98,50 +127,7 @@ export default function CaptainView() {
     if (captain) { await loadTasks(captain.id); setTab('done'); }
   }
 
-  // ── Captain picker ───────────────────────────────────────────
-  if (!captain) {
-    return (
-      <div dir="rtl" className="min-h-[100dvh] bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-4">
-        <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm p-8 max-w-sm w-full">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 bg-brand-50 rounded-xl flex items-center justify-center">
-              <IcCar className="w-5 h-5 text-brand-600" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold text-slate-900 dark:text-white">بوابة الكابتن</h1>
-              <p className="text-slate-500 dark:text-slate-400 text-sm">اختر اسمك للمتابعة</p>
-            </div>
-          </div>
-
-          {captainsLoading && (
-            <div className="text-center py-8">
-              <div className="w-7 h-7 border-2 border-brand-600 border-t-transparent rounded-full animate-spin mx-auto" />
-            </div>
-          )}
-          {!captainsLoading && allCaptains.length === 0 && (
-            <p className="text-slate-400 dark:text-slate-500 text-center py-6 text-sm">لا يوجد كباتن مضافون بعد</p>
-          )}
-          <div className="space-y-2">
-            {allCaptains.map(c => (
-              <button
-                key={c.id}
-                onClick={() => selectCaptain(c)}
-                className="w-full flex items-center gap-4 px-4 py-4 bg-slate-50 dark:bg-slate-700 hover:bg-brand-50 hover:border-brand-300 border border-slate-200 dark:border-slate-600 rounded-xl transition-all text-right"
-              >
-                <div className="w-10 h-10 bg-brand-100 rounded-full flex items-center justify-center flex-shrink-0">
-                  <span className="text-brand-700 font-bold text-lg">{c.name.charAt(0)}</span>
-                </div>
-                <div>
-                  <p className="font-semibold text-slate-900 dark:text-white">{c.name}</p>
-                  {c.phone && <p className="text-xs text-slate-400 dark:text-slate-500 font-mono" dir="ltr">{c.phone}</p>}
-                </div>
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
-  }
+  if (!captain) return <CaptainLogin onLogin={c => { setCaptain(c); loadTasks(c.id); }} />;
 
   // ── Tasks view ────────────────────────────────────────────
   return (
@@ -162,10 +148,10 @@ export default function CaptainView() {
             <IcRefresh className={`w-5 h-5 text-slate-500 dark:text-slate-400 ${loading ? 'animate-spin' : ''}`} />
           </button>
           <button
-            onClick={() => { setCaptain(null); setTasks([]); setRecentDone([]); }}
-            className="px-3 py-2 text-sm text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors"
+            onClick={() => { localStorage.removeItem('wt_cpt'); setCaptain(null); setTasks([]); setRecentDone([]); }}
+            className="px-3 py-1.5 text-xs font-semibold text-slate-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950 rounded-xl transition-colors"
           >
-            تغيير
+            خروج
           </button>
         </div>
       </header>

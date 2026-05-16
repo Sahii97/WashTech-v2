@@ -29,7 +29,48 @@ const ACTIVE_STATUSES = ['approved', 'accepted', 'on_process', 'on_road'];
 
 const DEFAULT_PRICES: Record<string, number> = { basic: 15000, standard: 25000, premium: 35000, 'أساسي': 15000, 'قياسي': 25000, 'ممتاز': 35000 };
 
+function ManagerLogin({ onLogin }: { onLogin: (name: string) => void }) {
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [err, setErr]           = useState('');
+  const [loading, setLoading]   = useState(false);
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setErr(''); setLoading(true);
+    const res = await fetch('/api/manager/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password }) });
+    const d = await res.json();
+    setLoading(false);
+    if (res.ok) {
+      localStorage.setItem('wt_mgr', JSON.stringify({ id: d.manager.id, name: d.manager.name }));
+      onLogin(d.manager.name);
+    } else setErr(d.error || 'خطأ');
+  }
+  return (
+    <div dir="rtl" className="min-h-[100dvh] bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-4">
+      <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm p-8 max-w-sm w-full">
+        <div className="mb-6"><WashTechLogo size={32} /></div>
+        <h1 className="text-lg font-bold text-slate-900 dark:text-white mb-1">لوحة المدير</h1>
+        <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">سجّل دخولك للمتابعة</p>
+        <form onSubmit={submit} className="space-y-3">
+          <input value={username} onChange={e => setUsername(e.target.value)} placeholder="اسم المستخدم" dir="ltr"
+            className="w-full px-3 py-2.5 border border-slate-200 dark:border-slate-600 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 bg-white dark:bg-slate-700 dark:text-white" />
+          <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="كلمة المرور" dir="ltr"
+            className="w-full px-3 py-2.5 border border-slate-200 dark:border-slate-600 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 bg-white dark:bg-slate-700 dark:text-white" />
+          {err && <p className="text-xs text-red-500">{err}</p>}
+          <button type="submit" disabled={loading || !username || !password}
+            className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white font-bold text-sm rounded-xl transition-colors">
+            {loading ? '...' : 'دخول'}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 export default function ManagerDashboard() {
+  const [auth, setAuth] = useState<{ id: string; name: string } | null>(() => {
+    try { return JSON.parse(localStorage.getItem('wt_mgr') || 'null'); } catch { return null; }
+  });
   const [bookings,        setBookings]        = useState<Booking[]>([]);
   const [drivers,         setDrivers]         = useState<Driver[]>([]);
   const [tab,             setTab]             = useState<Tab>('pending');
@@ -104,17 +145,25 @@ export default function ManagerDashboard() {
 
   const inp = 'w-full px-3 py-2.5 border border-slate-200 dark:border-slate-600 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 bg-white dark:bg-slate-700 dark:text-white transition';
 
+  if (!auth) return <ManagerLogin onLogin={name => setAuth({ id: '', name })} />;
+
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950" dir="rtl">
       {/* Header */}
       <header className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 px-6 py-4 flex items-center justify-between sticky top-0 z-10">
         <div className="flex flex-col gap-0.5">
           <WashTechLogo size={28} />
-          <p className="text-sm text-slate-500 dark:text-slate-400">{bookings.length} حجز إجمالي</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400">{auth.name} · {bookings.length} حجز</p>
         </div>
-        <button onClick={() => { load(); }} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors" title="تحديث">
-          <IcRefresh className={`w-5 h-5 text-slate-500 dark:text-slate-400 ${loading ? 'animate-spin' : ''}`} />
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={() => { load(); }} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors" title="تحديث">
+            <IcRefresh className={`w-5 h-5 text-slate-500 dark:text-slate-400 ${loading ? 'animate-spin' : ''}`} />
+          </button>
+          <button onClick={() => { localStorage.removeItem('wt_mgr'); setAuth(null); }}
+            className="px-3 py-1.5 text-xs font-semibold text-slate-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950 rounded-xl transition-colors">
+            خروج
+          </button>
+        </div>
       </header>
 
 

@@ -343,9 +343,43 @@ async function creditCaptainWallet(driverId: string, totalAmount: number, captai
   }
 }
 
-// ── Express app ───────────────────────────────────────────────
-const app = express();
-app.use(express.json());
+// ── Auth endpoints ────────────────────────────────────────────
+app.post('/api/manager/login', async (req, res) => {
+  const { username, password } = req.body || {};
+  if (!username || !password) return res.status(400).json({ error: 'بيانات ناقصة' });
+  try {
+    const snap = await getDocs(collection(db, 'managers'));
+    const mgr = snap.docs.map(d => ({ id: d.id, ...(d.data() as any) }))
+      .find(m => m.username === username && m.password === password);
+    if (mgr) res.json({ success: true, manager: { id: mgr.id, name: mgr.name } });
+    else res.status(401).json({ error: 'اسم المستخدم أو كلمة المرور غير صحيحة' });
+  } catch (e) { res.status(500).json({ error: 'خطأ في الخادم' }); }
+});
+
+app.post('/api/captain/login', async (req, res) => {
+  const { code } = req.body || {};
+  if (!code) return res.status(400).json({ error: 'الكود مطلوب' });
+  try {
+    const snap = await getDocs(collection(db, 'drivers'));
+    const cpt = snap.docs.map(d => ({ id: d.id, ...(d.data() as any) }))
+      .find(c => String(c.code) === String(code));
+    if (cpt) res.json({ success: true, captain: { id: cpt.id, name: cpt.name } });
+    else res.status(401).json({ error: 'الكود غير صحيح' });
+  } catch (e) { res.status(500).json({ error: 'خطأ في الخادم' }); }
+});
+
+app.post('/api/admin/login', async (req, res) => {
+  const { password } = req.body || {};
+  if (!password) return res.status(400).json({ error: 'كلمة المرور مطلوبة' });
+  try {
+    const cfg = await getSetting<any>('app_config', {});
+    const adminPwd = cfg.adminPassword || process.env.ADMIN_PASSWORD || 'admin1234';
+    if (password === adminPwd) res.json({ success: true });
+    else res.status(401).json({ error: 'كلمة المرور غير صحيحة' });
+  } catch (e) { res.status(500).json({ error: 'خطأ في الخادم' }); }
+});
+
+
 
 app.get('/api/health', (_req, res) => {
   res.json({

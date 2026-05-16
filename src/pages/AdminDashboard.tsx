@@ -265,7 +265,41 @@ function RuleForm({
 }
 
 // ── Main component ────────────────────────────────────────────
+function AdminLogin({ onLogin }: { onLogin: () => void }) {
+  const [pw, setPw]   = useState('');
+  const [err, setErr] = useState('');
+  const [loading, setLoading] = useState(false);
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setErr(''); setLoading(true);
+    const res = await fetch('/api/admin/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: pw }) });
+    const d = await res.json();
+    setLoading(false);
+    if (res.ok) { localStorage.setItem('wt_adm', '1'); onLogin(); }
+    else setErr(d.error || 'خطأ');
+  }
+  return (
+    <div dir="rtl" className="min-h-[100dvh] bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-4">
+      <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm p-8 max-w-sm w-full">
+        <div className="mb-6"><WashTechLogo size={32} /></div>
+        <h1 className="text-lg font-bold text-slate-900 dark:text-white mb-1">لوحة التحكم</h1>
+        <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">أدخل كلمة المرور للدخول</p>
+        <form onSubmit={submit} className="space-y-3">
+          <input type="password" value={pw} onChange={e => setPw(e.target.value)} placeholder="كلمة المرور" dir="ltr"
+            className="w-full px-3 py-2.5 border border-slate-200 dark:border-slate-600 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 bg-white dark:bg-slate-700 dark:text-white" />
+          {err && <p className="text-xs text-red-500">{err}</p>}
+          <button type="submit" disabled={loading || !pw}
+            className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white font-bold text-sm rounded-xl transition-colors">
+            {loading ? '...' : 'دخول'}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 export default function AdminDashboard() {
+  const [authed, setAuthed] = useState(() => localStorage.getItem('wt_adm') === '1');
   const [section, setSection] = useState<Section>('workflow');
   const [dark, setDark] = useState(() => localStorage.getItem('wt_dark') === '1');
 
@@ -294,7 +328,7 @@ export default function AdminDashboard() {
 
   // Dynamic settings state
   const [finConfig,      setFinConfig]      = useState({ captainSharePct: 70, basic: 15000, standard: 25000, premium: 35000, basicName: 'أساسي', standardName: 'قياسي', premiumName: 'ممتاز', basicName_ku: '', standardName_ku: '', premiumName_ku: '', basicDesc_ar: '', standardDesc_ar: '', premiumDesc_ar: '', basicDesc_ku: '', standardDesc_ku: '', premiumDesc_ku: '' });
-  const [appConfig,      setAppConfig]      = useState({ appName: 'WashTech', tagline: 'خدمة غسيل سيارات احترافية', supportPhone: '', managerPhone: '', automationEnabled: true, wasenderToken: '' });
+  const [appConfig,      setAppConfig]      = useState({ appName: 'WashTech', tagline: 'خدمة غسيل سيارات احترافية', supportPhone: '', managerPhone: '', automationEnabled: true, wasenderToken: '', adminPassword: '' });
   const [settingsSaved,  setSettingsSaved]  = useState('');
   const [settingsLoading,setSettingsLoading]= useState(false);
 
@@ -589,6 +623,8 @@ export default function AdminDashboard() {
   }
 
   // ── Render ────────────────────────────────────────────────────
+  if (!authed) return <AdminLogin onLogin={() => setAuthed(true)} />;
+
   return (
     <div dir="rtl" className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col">
 
@@ -608,6 +644,10 @@ export default function AdminDashboard() {
           <button onClick={loadAll}
             className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors text-slate-400 dark:text-slate-500">
             <RefreshCw size={16} strokeWidth={2} />
+          </button>
+          <button onClick={() => { localStorage.removeItem('wt_adm'); setAuthed(false); }}
+            className="px-3 py-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950 rounded-xl transition-colors">
+            خروج
           </button>
         </div>
       </header>
@@ -997,6 +1037,18 @@ export default function AdminDashboard() {
                       onChange={e => setAppConfig(p => ({ ...p, wasenderToken: e.target.value }))}
                       className={inp + ' font-mono text-xs'}
                       placeholder="ws_xxxxxxxxxxxxxxxx"
+                      dir="ltr"
+                      type="password"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">كلمة مرور لوحة التحكم</label>
+                    <p className="text-xs text-slate-400 dark:text-slate-500 mb-1.5">الافتراضية: admin1234 — غيّرها فوراً</p>
+                    <input
+                      value={appConfig.adminPassword || ''}
+                      onChange={e => setAppConfig(p => ({ ...p, adminPassword: e.target.value }))}
+                      className={inp + ' font-mono'}
+                      placeholder="كلمة مرور جديدة"
                       dir="ltr"
                       type="password"
                     />
