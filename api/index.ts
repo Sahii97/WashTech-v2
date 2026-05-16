@@ -364,6 +364,23 @@ app.get('/go/:code', async (req, res) => {
   } catch { res.status(500).send('Server error'); }
 });
 
+// ── Packages ──────────────────────────────────────────────────
+app.get('/api/packages', async (_req, res) => {
+  try {
+    const finCfg = await getSetting<any>('finance_config', {});
+    const names = finCfg.packageNames || {};
+    const descs = finCfg.packageDescriptions || {};
+    const prices = finCfg.packagePrices || {};
+    res.json({
+      packages: {
+        basic:    { name: names.basic    || 'أساسي',  desc: descs.basic    || '', price: prices.basic    || 15000 },
+        standard: { name: names.standard || 'قياسي',  desc: descs.standard || '', price: prices.standard || 25000 },
+        premium:  { name: names.premium  || 'ممتاز',  desc: descs.premium  || '', price: prices.premium  || 35000 },
+      }
+    });
+  } catch { res.json({ packages: {} }); }
+});
+
 // ── Slots ─────────────────────────────────────────────────────
 app.get('/api/slots', async (_req, res) => {
   res.json({ slots: await getSetting('slots', DEFAULT_SLOTS) });

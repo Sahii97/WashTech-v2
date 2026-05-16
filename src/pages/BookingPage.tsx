@@ -17,6 +17,7 @@ export default function BookingPage() {
   const [errorMsg, setErrorMsg] = useState('');
   const [slots, setSlots] = useState<string[]>([]);
   const [neighborhoods, setNeighborhoods] = useState<string[]>([]);
+  const [pkgData, setPkgData] = useState<Record<string, { name: string; desc: string; price: number }>>({});
 
   const [gpsLoading, setGpsLoading] = useState(false);
   const [gpsError, setGpsError] = useState('');
@@ -30,6 +31,7 @@ export default function BookingPage() {
   useEffect(() => {
     fetch('/api/slots').then(r => r.json()).then(d => setSlots(d.slots || []));
     fetch('/api/neighborhoods').then(r => r.json()).then(d => setNeighborhoods(d.neighborhoods || []));
+    fetch('/api/packages').then(r => r.json()).then(d => setPkgData(d.packages || {}));
   }, []);
 
   const set = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }));
@@ -254,16 +256,22 @@ export default function BookingPage() {
               </Field>
               <Field label={tr.package}>
                 <div className="space-y-2">
-                  {Object.entries(tr.packages).map(([k, v]) => (
+                  {Object.entries(tr.packages).map(([k, v]) => {
+                    const pkg = pkgData[k];
+                    const displayName = pkg?.name || v;
+                    const desc = pkg?.desc;
+                    return (
                       <button
                         key={k}
                         type="button"
                         onClick={() => set('package', k)}
                         className={`w-full p-3 rounded-xl border-2 text-sm font-medium text-start transition-all ${form.package === k ? 'border-brand-600 bg-brand-50 text-brand-700' : 'border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-200 hover:border-slate-300 dark:hover:border-slate-500'}`}
                       >
-                        {v}
+                        <span className="block">{displayName}</span>
+                        {desc && <span className="block text-xs font-normal mt-0.5 opacity-70">{desc}</span>}
                       </button>
-                  ))}
+                    );
+                  })}
                 </div>
               </Field>
             </div>

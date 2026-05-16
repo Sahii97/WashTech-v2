@@ -11,6 +11,14 @@ type Booking = {
 type Driver = { id: string; name: string; code: string };
 type Tab = 'pending' | 'active' | 'completed' | 'rejected';
 
+function timeAgo(iso: string): string {
+  const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+  if (diff < 60)    return `منذ ${diff} ث`;
+  if (diff < 3600)  return `منذ ${Math.floor(diff / 60)} د`;
+  if (diff < 86400) return `منذ ${Math.floor(diff / 3600)} س`;
+  return `منذ ${Math.floor(diff / 86400)} يوم`;
+}
+
 const STATUS_LABELS: Record<string, string> = {
   pending: 'انتظار', approved: 'مقبول', accepted: 'مقبول من الكابتن',
   on_process: 'جاري', on_road: 'في الطريق', completed: 'مكتمل',
@@ -160,6 +168,9 @@ export default function ManagerDashboard() {
                     </p>
                   )}
                   <p className="text-xs text-slate-400 dark:text-slate-500 mt-1 font-mono">#{b.id.slice(-8)}</p>
+                  {b.createdAt && (
+                    <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">🕐 {timeAgo(b.createdAt)}</p>
+                  )}
                 </div>
 
                 {b.status === 'pending' && (

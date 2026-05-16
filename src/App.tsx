@@ -27,7 +27,7 @@ function DevNav() {
         { to: '/',        label: 'الحجز'    },
         { to: '/manager', label: 'المدير'   },
         { to: '/driver',  label: 'الكابتن'  },
-        { to: '/admin',   label: 'الإدارة'  },
+        { to: '/admin',   label: 'لوحة التحكم'  },
       ].map(({ to, label }) => (
         <NavLink
           key={to}
