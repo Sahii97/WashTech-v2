@@ -8,7 +8,7 @@ type Booking = {
   status: string; driverId?: string; createdAt: string;
   financials?: { totalAmount: number; captainShare: number; companyShare: number };
 };
-type Driver = { id: string; name: string; code: string };
+type Driver = { id: string; name: string; code: string; phone?: string };
 type Tab = 'pending' | 'active' | 'completed' | 'rejected';
 
 function timeAgo(iso: string): string {
@@ -84,6 +84,8 @@ export default function ManagerDashboard() {
   const [drivers,         setDrivers]         = useState<Driver[]>([]);
   const [tab,             setTab]             = useState<Tab>('pending');
   const [selectedDrivers, setSelectedDrivers] = useState<Record<string, string>>({});
+  const [driverFilter,    setDriverFilter]    = useState('all');
+  const [query,           setQuery]           = useState('');
   const [loading,         setLoading]         = useState(false);
   const [pkgPrices,       setPkgPrices]       = useState<Record<string, number>>(DEFAULT_PRICES);
 
@@ -91,6 +93,8 @@ export default function ManagerDashboard() {
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Magic-link auto-login: /manager?token=xxx
+  function bookingAmount(booking: Booking): number { return booking.financials?.totalAmount || getPrice(booking.package); }
+
   useEffect(() => {
     const token = new URLSearchParams(window.location.search).get('token');
     if (!token) return;
@@ -147,12 +151,24 @@ export default function ManagerDashboard() {
 
   const bookingTabs = (['pending', 'active', 'completed', 'rejected'] as const);
 
-  const filtered = bookings.filter(b =>
-    tab === 'pending'    ? b.status === 'pending' :
-    tab === 'active'     ? ACTIVE_STATUSES.includes(b.status) :
-    tab === 'completed'  ? ['completed', 'closed'].includes(b.status) :
-    tab === 'rejected'   ? b.status === 'rejected' : false
-  );
+  const filtered = bookings
+    .filter(b =>
+      tab === 'pending'    ? b.status === 'pending' :
+      tab === 'active'     ? ACTIVE_STATUSES.includes(b.status) :
+      tab === 'completed'  ? ['completed', 'closed'].includes(b.status) :
+      tab === 'rejected'   ? b.status === 'rejected' : false
+    )
+    .filter(b => driverFilter === 'all' ? true : b.driverId === driverFilter)
+    .filter(b => {
+      const q = query.trim().toLowerCase();
+      if (!q) return true;
+      return (
+        b.name.toLowerCase().includes(q) ||
+        b.phone.toLowerCase().includes(q) ||
+        b.neighborhood.toLowerCase().includes(q) ||
+        b.id.toLowerCase().includes(q)
+      );
+    });
 
   const counts = {
     pending:   bookings.filter(b => b.status === 'pending').length,
@@ -170,6 +186,14 @@ export default function ManagerDashboard() {
   ];
 
   const inp = 'w-full px-3 py-2.5 border border-slate-200 dark:border-slate-600 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 bg-white dark:bg-slate-700 dark:text-white transition';
+  const summaryBookings = bookings.filter(b => driverFilter === 'all' ? true : b.driverId === driverFilter);
+  const selectedDriver = driverFilter === 'all' ? null : drivers.find(d => d.id === driverFilter) || null;
+  const summaryStats = {
+    total: summaryBookings.length,
+    active: summaryBookings.filter(b => ACTIVE_STATUSES.includes(b.status)).length,
+    completed: summaryBookings.filter(b => ['completed', 'closed'].includes(b.status)).length,
+    revenue: summaryBookings.reduce((sum, b) => sum + bookingAmount(b), 0),
+  };
 
   if (!auth) return <ManagerLogin onLogin={name => setAuth({ id: '', name })} />;
 
@@ -207,6 +231,49 @@ export default function ManagerDashboard() {
               <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{t.label}</div>
             </button>
           ))}
+        </div>
+        <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-4 space-y-4 mb-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <StatCard label={driverFilter === 'all' ? 'إجمالي الطلبات' : 'طلبات الكابتن'} value={String(summaryStats.total)} icon={<IcUser className="w-4 h-4 text-slate-500" />} />
+            <StatCard label="نشطة" value={String(summaryStats.active)} icon={<TrendingUp className="w-4 h-4 text-blue-500" />} />
+            <StatCard label="مكتملة" value={String(summaryStats.completed)} icon={<IcCheck className="w-4 h-4 text-green-500" />} />
+            <StatCard label="قيمة الطلبات" value={fmtPrice(summaryStats.revenue)} icon={<IcWallet className="w-4 h-4 text-emerald-500" />} />
+          </div>
+          <div className="space-y-2">
+            <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">تصفية حسب الكابتن</p>
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              <FilterChip active={driverFilter === 'all'} onClick={() => setDriverFilter('all')}>كل الكباتن</FilterChip>
+              {drivers.map(driver => (
+                <FilterChip key={driver.id} active={driverFilter === driver.id} onClick={() => setDriverFilter(driver.id)}>
+                  {driver.name}
+                </FilterChip>
+              ))}
+            </div>
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_280px] gap-3 items-start">
+            <input
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              placeholder="ابحث بالاسم أو الهاتف أو رقم الحجز"
+              className={inp}
+              dir="rtl"
+            />
+            <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 p-3 min-h-[88px]">
+              {selectedDriver ? (
+                <div className="space-y-1.5 text-sm">
+                  <p className="font-bold text-slate-900 dark:text-white">{selectedDriver.name}</p>
+                  <p className="text-slate-500 dark:text-slate-400">كود: <span dir="ltr">{selectedDriver.code}</span></p>
+                  {selectedDriver.phone && <p className="text-slate-500 dark:text-slate-400" dir="ltr">{selectedDriver.phone}</p>}
+                  <p className="text-slate-500 dark:text-slate-400">أنجز {summaryStats.completed} طلبات من أصل {summaryStats.total}</p>
+                </div>
+              ) : (
+                <div className="space-y-1.5 text-sm text-slate-500 dark:text-slate-400">
+                  <p className="font-semibold text-slate-700 dark:text-slate-200">نظرة سريعة</p>
+                  <p>اختر كابتناً لرؤية طلباته، نشاطه، وقيمة الطلبات من نفس الشاشة.</p>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -274,6 +341,31 @@ export default function ManagerDashboard() {
           ))}
         </div>
     </div>
+  );
+}
+
+function StatCard({ label, value, icon }: { label: string; value: string; icon: React.ReactNode }) {
+  return (
+    <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 p-3">
+      <div className="flex items-center gap-1.5 mb-1">{icon}<p className="text-xs text-slate-500 dark:text-slate-400">{label}</p></div>
+      <p className="font-bold text-slate-900 dark:text-white text-base" dir="ltr">{value}</p>
+    </div>
+  );
+}
+
+function FilterChip({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`px-3 py-2 rounded-xl text-sm whitespace-nowrap border transition-colors ${
+        active
+          ? 'bg-brand-600 text-white border-brand-600'
+          : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-slate-300'
+      }`}
+    >
+      {children}
+    </button>
   );
 }
 

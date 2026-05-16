@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Search as IcSearch } from 'lucide-react';
 
 const STATUS_AR: Record<string, { label: string; color: string }> = {
@@ -13,14 +13,14 @@ const STATUS_AR: Record<string, { label: string; color: string }> = {
 };
 
 export default function TrackPage() {
-  const [phone,    setPhone]    = useState('');
+  const [phone,    setPhone]    = useState(() => new URLSearchParams(window.location.search).get('phone') || '');
   const [bookings, setBookings] = useState<any[]>([]);
   const [loading,  setLoading]  = useState(false);
   const [searched, setSearched] = useState(false);
   const [error,    setError]    = useState('');
 
-  async function search(e: React.FormEvent) {
-    e.preventDefault();
+  async function search(e?: React.FormEvent) {
+    e?.preventDefault();
     if (!phone.trim()) return;
     setLoading(true);
     setError('');
@@ -33,6 +33,11 @@ export default function TrackPage() {
     } catch { setError('خطأ في الاتصال — تأكد من الاتصال بالإنترنت'); }
     setLoading(false);
   }
+
+  useEffect(() => {
+    if (phone.trim()) search();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div dir="rtl" className="min-h-[100dvh] bg-slate-50 dark:bg-slate-950 flex flex-col">

@@ -104,6 +104,17 @@ export default function BookingPage() {
     const carLabel = (tr.carTypes as Record<string,string>)[form.carType] || form.carType;
     const pkgLabel = (tr.packages as Record<string,string>)[form.package] || form.package;
     const dateLabel = form.date === 'today' ? tr.today : tr.tomorrow;
+    const nextSteps = lang === 'ar'
+      ? [
+          'يراجع المدير طلبك أولاً ثم يؤكد الحجز.',
+          'يصلك تحديث واتساب عند تعيين الكابتن وتحركه إليك.',
+          'يمكنك متابعة الحالة في أي وقت برقم هاتفك.',
+        ]
+      : [
+          'بەڕێوەبەر داواکارییەکەت دەبینێت و پاشان پشتڕاستی دەکاتەوە.',
+          'کاتێک کاپتن دیاری کرا یان بەرەو لات هات، وەاتساپت پێدەگات.',
+          'لە هەر کاتێکدا دەتوانیت بە ژمارەی مۆبایلەکەت شوێنی داواکارییەکەت بکەویت.',
+        ];
     return (
       <div dir={tr.dir} className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-4">
         <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-8 max-w-md w-full">
@@ -115,6 +126,11 @@ export default function BookingPage() {
             </div>
             <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-1">{tr.success}</h2>
             <p className="text-slate-500 dark:text-slate-400 text-sm">{tr.successMsg}</p>
+          </div>
+
+          <div className="rounded-xl border border-brand-200 dark:border-brand-800 bg-brand-50 dark:bg-brand-950 p-4 mb-5 text-center">
+            <p className="text-xs font-semibold text-brand-700 dark:text-brand-300 mb-1">{tr.bookingId}</p>
+            <p className="text-xl font-bold text-brand-900 dark:text-brand-100 font-mono">#{bookingId.slice(-8)}</p>
           </div>
 
           <div className="bg-slate-50 dark:bg-slate-700 rounded-xl p-4 space-y-2.5 mb-5 text-sm">
@@ -151,6 +167,38 @@ export default function BookingPage() {
             <p className="text-sm text-green-800 dark:text-green-300">
               {lang === 'ar' ? 'ستصلك رسالة واتساب بتأكيد الحجز وتحديثاته. شكراً لاختيارك WashTech!' : 'پەیامی واتساپت دەگات بە تازەکارییەکان. سوپاس بۆ هەڵبژاردنت WashTech!'}
             </p>
+          </div>
+
+          <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 p-4 mt-4">
+            <p className="text-sm font-semibold text-slate-900 dark:text-white mb-2">
+              {lang === 'ar' ? 'ماذا يحدث الآن؟' : 'ئێستا چی دەبێت؟'}
+            </p>
+            <div className="space-y-2">
+              {nextSteps.map((stepText, index) => (
+                <div key={stepText} className="flex items-start gap-3 text-sm text-slate-700 dark:text-slate-200">
+                  <div className="w-6 h-6 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-xs font-bold shrink-0">
+                    {index + 1}
+                  </div>
+                  <p>{stepText}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
+            <a
+              href={`/track?phone=${encodeURIComponent(form.phone)}`}
+              className="py-3 px-4 bg-brand-600 hover:bg-brand-700 text-white text-center font-semibold rounded-xl transition-colors"
+            >
+              {tr.trackBooking}
+            </a>
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="py-3 px-4 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 font-semibold rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+            >
+              {tr.newBooking}
+            </button>
           </div>
         </div>
       </div>

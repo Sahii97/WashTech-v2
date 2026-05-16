@@ -833,18 +833,18 @@ export default function AdminDashboard() {
               <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-5">
                 <p className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-3">إضافة كابتن</p>
                 <form onSubmit={createDriver} className="space-y-2">
-                  <div className="flex gap-2">
+                  <div className="flex flex-col sm:flex-row gap-2">
                     <input placeholder="الاسم" required className={inp + ' flex-1'} value={newDriver.name}
                       onChange={e => setNewDriver(p => ({ ...p, name: e.target.value }))} />
                     <input placeholder="الكود" maxLength={4} required
-                      className={inp + ' w-20 text-center font-mono'} value={newDriver.code}
+                      className={inp + ' sm:w-24 text-center font-mono'} value={newDriver.code}
                       onChange={e => setNewDriver(p => ({ ...p, code: e.target.value.replace(/\D/g, '') }))} />
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex flex-col sm:flex-row gap-2">
                     <input placeholder="واتساب 07XXXXXXXXX" type="tel" dir="ltr"
                       className={inp + ' flex-1'} value={newDriver.phone}
                       onChange={e => setNewDriver(p => ({ ...p, phone: e.target.value }))} />
-                    <button type="submit" className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl transition-colors disabled:opacity-40">
+                    <button type="submit" className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl transition-colors disabled:opacity-40 sm:min-w-[112px]">
                       <span className="flex items-center gap-1"><Plus size={16} strokeWidth={2} /> إضافة</span>
                     </button>
                   </div>
@@ -893,12 +893,12 @@ export default function AdminDashboard() {
                 <form onSubmit={createManager} className="space-y-2">
                   <input placeholder="الاسم الكامل" required className={inp} value={newManager.name}
                     onChange={e => setNewManager(p => ({ ...p, name: e.target.value }))} />
-                  <div className="flex gap-2">
+                  <div className="flex flex-col sm:flex-row gap-2">
                     <input placeholder="اسم المستخدم" required dir="ltr" className={inp + ' flex-1'} value={newManager.username}
                       onChange={e => setNewManager(p => ({ ...p, username: e.target.value }))} />
                     <input placeholder="كلمة المرور" type="password" required className={inp + ' flex-1'} value={newManager.password}
                       onChange={e => setNewManager(p => ({ ...p, password: e.target.value }))} />
-                    <button type="submit" className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl transition-colors">
+                    <button type="submit" className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl transition-colors sm:min-w-[112px]">
                       <span className="flex items-center gap-1"><Plus size={16} strokeWidth={2} /> إضافة</span>
                     </button>
                   </div>
