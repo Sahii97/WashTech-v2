@@ -20,9 +20,8 @@ import {
 } from 'lucide-react';
 import WashTechLogo from '../components/WashTechLogo';
 
-type StaffRole = 'admin' | 'manager';
 type Section = 'operations' | 'captains' | 'managers' | 'finance' | 'settings';
-type Session = { token: string; role: StaffRole; id: string; name: string };
+type Session = { token: string; role: 'admin'; id: string; name: string };
 type Driver = { id: string; name: string; code: string; phone?: string; token?: string };
 type Manager = { id: string; name: string; username: string; token?: string };
 type Booking = {
@@ -154,9 +153,7 @@ function DriverSelect({ drivers, value, onChange }: { drivers: Driver[]; value: 
 }
 
 function LoginScreen({ onLogin }: { onLogin: (session: Session) => void }) {
-  const [mode, setMode] = useState<StaffRole>('admin');
   const [password, setPassword] = useState('');
-  const [username, setUsername] = useState('');
   const [show, setShow] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -166,18 +163,16 @@ function LoginScreen({ onLogin }: { onLogin: (session: Session) => void }) {
     setLoading(true);
     setError('');
     try {
-      const res = await fetch(mode === 'admin' ? '/api/admin/login' : '/api/manager/login', {
+      const res = await fetch('/api/admin/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(mode === 'admin' ? { password } : { username, password }),
+        body: JSON.stringify({ password }),
       });
       const data = await res.json();
       if (!res.ok) {
         setError(data.error || 'تعذر تسجيل الدخول');
       } else {
-        const session: Session = mode === 'admin'
-          ? { token: data.token, role: 'admin', id: data.admin.id, name: data.admin.name }
-          : { token: data.token, role: 'manager', id: data.manager.id, name: data.manager.name };
+        const session: Session = { token: data.token, role: 'admin', id: data.admin.id, name: data.admin.name };
         saveSession(session);
         onLogin(session);
       }
@@ -191,37 +186,9 @@ function LoginScreen({ onLogin }: { onLogin: (session: Session) => void }) {
     <div dir="rtl" className="flex min-h-[100dvh] items-center justify-center bg-slate-50 p-4 dark:bg-slate-950">
       <div className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-8 shadow-sm dark:border-slate-700 dark:bg-slate-800">
         <div className="mb-6"><WashTechLogo size={32} /></div>
-        <div className="mb-4 flex rounded-xl bg-slate-100 p-1 dark:bg-slate-900">
-          {([
-            ['admin', 'الإدارة'],
-            ['manager', 'العمليات'],
-          ] as const).map(([key, label]) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => { setMode(key); setError(''); }}
-              className={`flex-1 rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${
-                mode === key ? 'bg-blue-600 text-white' : 'text-slate-500 dark:text-slate-400'
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
         <h1 className="mb-1 text-lg font-bold text-slate-900 dark:text-white">لوحة التحكم</h1>
-        <p className="mb-6 text-sm text-slate-500 dark:text-slate-400">
-          {mode === 'admin' ? 'تسجيل دخول الإدارة الكاملة' : 'تسجيل دخول العمليات'}
-        </p>
+        <p className="mb-6 text-sm text-slate-500 dark:text-slate-400">تسجيل دخول الإدارة</p>
         <form onSubmit={submit} className="space-y-3">
-          {mode === 'manager' && (
-            <input
-              value={username}
-              onChange={e => setUsername(e.target.value)}
-              placeholder="اسم المستخدم"
-              dir="ltr"
-              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 dark:border-slate-600 dark:bg-slate-700 dark:text-white"
-            />
-          )}
           <div className="relative">
             <input
               type={show ? 'text' : 'password'}
@@ -242,7 +209,7 @@ function LoginScreen({ onLogin }: { onLogin: (session: Session) => void }) {
           {error && <p className="text-xs text-red-500">{error}</p>}
           <button
             type="submit"
-            disabled={loading || !password || (mode === 'manager' && !username)}
+            disabled={loading || !password}
             className="w-full rounded-xl bg-blue-600 py-2.5 text-sm font-bold text-white transition-colors hover:bg-blue-700 disabled:opacity-40"
           >
             {loading ? '...' : 'دخول'}
@@ -279,7 +246,7 @@ export default function BackofficeDashboard() {
   }, [dark]);
 
   useEffect(() => {
-    if (session?.role === 'manager') setSection('operations');
+    if (session) setSection('operations');
   }, [session]);
 
   async function authFetch(url: string, init?: RequestInit) {
@@ -304,48 +271,34 @@ export default function BackofficeDashboard() {
       setBookings(bookingData.bookings || []);
       setDrivers(driverData.drivers || []);
 
-      if (session?.role === 'admin') {
-        const [managerRes, financeRes, financeConfigRes, appConfigRes] = await Promise.all([
-          authFetch('/api/admin/managers'),
-          authFetch('/api/admin/finance-overview'),
-          authFetch('/api/admin/settings/finance_config'),
-          authFetch('/api/admin/settings/app_config'),
-        ]);
-        const managerData = await managerRes.json();
-        const financeData = await financeRes.json();
-        const financeConfigData = await financeConfigRes.json();
-        const appConfigData = await appConfigRes.json();
-        setManagers(managerData.managers || []);
-        setFinOverview(financeData.overview || null);
-        setFinCaptains(financeData.captains || []);
-        if (financeConfigData?.value) {
-          setFinanceConfig({
-            captainSharePct: Math.round((financeConfigData.value.captainSharePct || 0.7) * 100),
-            basic: financeConfigData.value.packagePrices?.basic || 15000,
-            standard: financeConfigData.value.packagePrices?.standard || 25000,
-            premium: financeConfigData.value.packagePrices?.premium || 35000,
-          });
-        }
-        if (appConfigData?.value) setAppConfig(prev => ({ ...prev, ...appConfigData.value }));
+      const [managerRes, financeRes, financeConfigRes, appConfigRes] = await Promise.all([
+        authFetch('/api/admin/managers'),
+        authFetch('/api/admin/finance-overview'),
+        authFetch('/api/admin/settings/finance_config'),
+        authFetch('/api/admin/settings/app_config'),
+      ]);
+      const managerData = await managerRes.json();
+      const financeData = await financeRes.json();
+      const financeConfigData = await financeConfigRes.json();
+      const appConfigData = await appConfigRes.json();
+      setManagers(managerData.managers || []);
+      setFinOverview(financeData.overview || null);
+      setFinCaptains(financeData.captains || []);
+      if (financeConfigData?.value) {
+        setFinanceConfig({
+          captainSharePct: Math.round((financeConfigData.value.captainSharePct || 0.7) * 100),
+          basic: financeConfigData.value.packagePrices?.basic || 15000,
+          standard: financeConfigData.value.packagePrices?.standard || 25000,
+          premium: financeConfigData.value.packagePrices?.premium || 35000,
+        });
       }
+      if (appConfigData?.value) setAppConfig(prev => ({ ...prev, ...appConfigData.value }));
     } finally {
       setLoading(false);
     }
   }
 
   useEffect(() => {
-    const token = new URLSearchParams(window.location.search).get('token');
-    if (!token || session) return;
-    fetch(`/api/auth/manager?token=${encodeURIComponent(token)}`)
-      .then(r => r.json())
-      .then(data => {
-        if (!data.success) return;
-        const nextSession: Session = { token: data.token, role: 'manager', id: data.manager.id, name: data.manager.name };
-        saveSession(nextSession);
-        setSession(nextSession);
-        window.history.replaceState({}, '', '/admin');
-      })
-      .catch(() => {});
   }, [session]);
 
   useEffect(() => {
@@ -353,16 +306,14 @@ export default function BackofficeDashboard() {
   }, [session]);
 
   const visibleNav = useMemo(
-    () => (session?.role === 'manager'
-      ? [{ key: 'operations', label: 'العمليات', icon: <LayoutGrid size={20} strokeWidth={1.5} /> }]
-      : [
-          { key: 'operations', label: 'العمليات', icon: <LayoutGrid size={20} strokeWidth={1.5} /> },
-          { key: 'captains', label: 'الكباتن', icon: <Car size={20} strokeWidth={1.5} /> },
-          { key: 'managers', label: 'المدراء', icon: <Users size={20} strokeWidth={1.5} /> },
-          { key: 'finance', label: 'المالية', icon: <Wallet size={20} strokeWidth={1.5} /> },
-          { key: 'settings', label: 'الإعدادات', icon: <Settings size={20} strokeWidth={1.5} /> },
-        ]) as { key: Section; label: string; icon: React.ReactNode }[],
-    [session],
+    () => ([
+      { key: 'operations', label: 'العمليات', icon: <LayoutGrid size={20} strokeWidth={1.5} /> },
+      { key: 'captains', label: 'الكباتن', icon: <Car size={20} strokeWidth={1.5} /> },
+      { key: 'managers', label: 'المدراء', icon: <Users size={20} strokeWidth={1.5} /> },
+      { key: 'finance', label: 'المالية', icon: <Wallet size={20} strokeWidth={1.5} /> },
+      { key: 'settings', label: 'الإعدادات', icon: <Settings size={20} strokeWidth={1.5} /> },
+    ]) as { key: Section; label: string; icon: React.ReactNode }[],
+    [],
   );
 
   const priceMap = useMemo<Record<string, number>>(
@@ -472,7 +423,7 @@ export default function BackofficeDashboard() {
           <WashTechLogo size={32} />
           <div className="text-sm text-slate-500 dark:text-slate-400">
             <div>{session.name}</div>
-            <div>{session.role === 'admin' ? 'إدارة كاملة' : 'صلاحيات العمليات'}</div>
+            <div>إدارة كاملة</div>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -607,7 +558,7 @@ export default function BackofficeDashboard() {
             </div>
           )}
 
-          {section === 'captains' && session.role === 'admin' && (
+          {section === 'captains' && (
             <div className="space-y-4">
               <div className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-800">
                 <h2 className="mb-3 text-lg font-bold text-slate-900 dark:text-white">إضافة كابتن</h2>
@@ -639,7 +590,7 @@ export default function BackofficeDashboard() {
             </div>
           )}
 
-          {section === 'managers' && session.role === 'admin' && (
+          {section === 'managers' && (
             <div className="space-y-4">
               <div className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-800">
                 <h2 className="mb-3 text-lg font-bold text-slate-900 dark:text-white">إضافة مدير عمليات</h2>
@@ -669,7 +620,7 @@ export default function BackofficeDashboard() {
             </div>
           )}
 
-          {section === 'finance' && session.role === 'admin' && (
+          {section === 'finance' && (
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
                 <StatCard label="إجمالي الإيرادات" value={String(finOverview?.totalRevenue?.toLocaleString('ar-IQ') || 0)} icon={<DollarSign className="h-4 w-4 text-green-500" />} />
@@ -699,7 +650,7 @@ export default function BackofficeDashboard() {
             </div>
           )}
 
-          {section === 'settings' && session.role === 'admin' && (
+          {section === 'settings' && (
             <div className="space-y-4">
               <div className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-800">
                 <h2 className="mb-4 flex items-center gap-2 text-lg font-bold text-slate-900 dark:text-white"><Terminal size={18} /> إعدادات التطبيق</h2>
