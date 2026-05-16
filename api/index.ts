@@ -6,6 +6,37 @@ import { getFirestore as adminGetFirestore } from 'firebase-admin/firestore';
 // ── Firebase Admin SDK (bypasses Firestore security rules) ────
 const DB_ID = process.env.FIREBASE_DATABASE_ID || 'ai-studio-ae98497f-378e-4913-8fbf-662dadf0b548';
 
+const SA_PROJECT_ID    = 'gen-lang-client-0754111363';
+const SA_CLIENT_EMAIL  = 'firebase-adminsdk-fbsvc@gen-lang-client-0754111363.iam.gserviceaccount.com';
+const SA_PRIVATE_KEY   = `-----BEGIN PRIVATE KEY-----
+MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQDHMxJNknH8d5Qg
+Rex3L+3147ylsMV3z5RfhQh1/xRDaoJOL947/P5w7pQv5DG/opVFtm0ptxYQ/HTm
+qGdTtd+TjJ1cxBlWk9T5GnG1duUXsL+DC/7prcq5yixNZQM+C3lr4KP98qQmbbT3
+6EGdj5tc8hTC92H++twu0GHSawh1d5+de5dwsO/dNEDkXFtLIgHwERKNvjA/IPrL
+eoKu7MkOsLzSd8oiXNG+zmRuNyrHhzwZcuT2Lx0p35gBszuOWhtrmElShNhwGdWG
+rgc3krnl3gmlS1mbC0DvpPPbIOOs7FcY61KR6NaU6fvBWtNTVZCR6sBfBfVM+Rmy
+QugX+lwvAgMBAAECggEAJbWi3OGAx5kBhxyFl8iQhTCAGWO99iDrRyvhfqjztpF2
+qoOAUB3kMw/PKMPLsSn/lStkPfXlbQDFxpaRvPScpwuDDLkozM1+j0u0w/QGiXYR
+wyalsqoOSx6dRWd+diPo8AWeNehVr9qr3BRxO3kgobdIO+JmAEWQIiKbqiBOASJ3
+BkU6VnyAw+nu7WsEaPZ/FKTqdUEC1ipz5h6mFW/9aKwr/+Sn8CA/9Ia+xrG+zJ2q
+bsArz1wGR6TDwv+0vUynQRPyvEIz7Mi/UIQQ0V0ZW2aeHYTIfi6NVx/PKAtLhViU
+e4aPe9gp+RaL2IHfwx6EBQjWCjuQlB1OhjtEKQDgCQKBgQDvNWTXaAVkatx3xIKT
+icRcxakKYMbsbhNovxHIMUYqEZtGz9KWkJixVGxIX+KoHlqCVjG8/XDI+CMybVDh
+C8/vZAOnZfeNGIawF3HTKaAK5YvJFwk5nbFCQgCIWtScSSuA2PeI03JuNRmk+9qS
+qpQ0qFR0JcErvMxJ0MfHeQX/OQKBgQDVLrW5p0d+cDvuu8vAowup/b5P9YL/svEI
+KHCbSjfej0bIqOyJsPtk3+bqk3kIh22OyHkNpuPz5pBoBPSdfSgIsEMe0ce3d2EL
+Q8V6DDIejO8/jVeYQfW2InXk3XaJYr13fAH2sqgZVuuGrEqmOLnIinnfVbinMWdj
+2/SNbjnOpwKBgQCMC8WTO0pU5R9YW0tbV4AIFI0ID2rHBxcD70FY5EhA3vf6uDeB
+gPx0bYnLwZ9wb/zra81I6VR7xJLOtiNw7jp53CMrgU4yZBaOx9sTFr6lQojZXUxA
+WCtsMDohmpP5P/lhQSWDDNBk51+xMOZhkc6dGaQAMA5tLeaonLwp85foOQKBgQC2
+4CcMaC+wi18eYQNc8YFkBkRoG1iROVQDh41x6a0bwxUZta+UPrqpwlk5CeFeK68U
+OW1/BJev9y4RzY56O49IRMyPd643+LTLEQwqsqOcCZKDliB6gLrjz5QLDOBO4uFd
+yod0tbX2ZtYM5Wf0R90353K837BT3NGwnFOhr9jvKQKBgDr8+nEQ2pv4pdEbXdtA
+o1ozN6AhejZLAlfcFd5q0SchLk96aHuKsghwKiY/E9b3jSOd4fkUgFeOKFh2NEP2
+c89a9Xf7GfSqYs3xz3AeHgdL6iw8KNO3AGMx7H3x7d2IOUBZrShDNGj7SCwbKfrq
+CzBcViY2LiSuhKeOmQpc2gq6
+-----END PRIVATE KEY-----`;
+
 let adminApp: App;
 if (adminGetApps().length) {
   adminApp = adminGetApps()[0];
@@ -14,9 +45,11 @@ if (adminGetApps().length) {
   const credential = sa
     ? cert(JSON.parse(sa))
     : cert({
-        projectId:   process.env.FIREBASE_PROJECT_ID   || 'gen-lang-client-0754111363',
-        clientEmail: process.env.FIREBASE_CLIENT_EMAIL || '',
-        privateKey:  (process.env.FIREBASE_PRIVATE_KEY || '').replace(/\\n/g, '\n'),
+        projectId:   process.env.FIREBASE_PROJECT_ID   || SA_PROJECT_ID,
+        clientEmail: process.env.FIREBASE_CLIENT_EMAIL || SA_CLIENT_EMAIL,
+        privateKey:  process.env.FIREBASE_PRIVATE_KEY
+          ? process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n')
+          : SA_PRIVATE_KEY,
       });
   adminApp = adminInit({ credential });
 }
