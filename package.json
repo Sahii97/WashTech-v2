@@ -2,7 +2,9 @@
   "name": "washtech-v2",
   "version": "2.0.0",
   "type": "module",
-  "engines": { "node": "20.x" },
+  "engines": {
+    "node": "20.x"
+  },
   "scripts": {
     "dev": "tsx server.ts",
     "build": "vite build && esbuild server.ts --platform=node --target=node18 --bundle --format=cjs --outfile=dist/server.cjs --external:vite --external:fsevents",
@@ -13,6 +15,7 @@
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "firebase": "^10.12.0",
+    "firebase-admin": "^13.10.0",
     "lucide-react": "^1.14.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

@@ -1,22 +1,47 @@
 import 'dotenv/config';
 import express from 'express';
-import { initializeApp, getApps } from 'firebase/app';
-import {
-  getFirestore, collection, addDoc, getDocs,
-  doc, updateDoc, deleteDoc, setDoc, getDoc,
-} from 'firebase/firestore';
+import { initializeApp as adminInit, getApps as adminGetApps, cert, App } from 'firebase-admin/app';
+import { getFirestore as adminGetFirestore } from 'firebase-admin/firestore';
 
-// ── Firebase ─────────────────────────────────────────────────
-const firebaseConfig = {
-  apiKey:            process.env.FIREBASE_API_KEY            || 'AIzaSyDRxH5dqU0RanerfWCTYuI2WR5Cv43K2sU',
-  authDomain:        process.env.FIREBASE_AUTH_DOMAIN        || 'gen-lang-client-0754111363.firebaseapp.com',
-  projectId:         process.env.FIREBASE_PROJECT_ID         || 'gen-lang-client-0754111363',
-  storageBucket:     process.env.FIREBASE_STORAGE_BUCKET     || 'gen-lang-client-0754111363.firebasestorage.app',
-  messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID|| '271263579220',
-  appId:             process.env.FIREBASE_APP_ID             || '1:271263579220:web:8aae94d14a4d96f38d01c1',
-};
-const fbApp = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
-const db = getFirestore(fbApp, process.env.FIREBASE_DATABASE_ID || 'ai-studio-ae98497f-378e-4913-8fbf-662dadf0b548');
+// ── Firebase Admin SDK (bypasses Firestore security rules) ────
+const DB_ID = process.env.FIREBASE_DATABASE_ID || 'ai-studio-ae98497f-378e-4913-8fbf-662dadf0b548';
+
+let adminApp: App;
+if (adminGetApps().length) {
+  adminApp = adminGetApps()[0];
+} else {
+  const sa = process.env.FIREBASE_SERVICE_ACCOUNT;
+  const credential = sa
+    ? cert(JSON.parse(sa))
+    : cert({
+        projectId:   process.env.FIREBASE_PROJECT_ID   || 'gen-lang-client-0754111363',
+        clientEmail: process.env.FIREBASE_CLIENT_EMAIL || '',
+        privateKey:  (process.env.FIREBASE_PRIVATE_KEY || '').replace(/\\n/g, '\n'),
+      });
+  adminApp = adminInit({ credential });
+}
+const fdb = adminGetFirestore(adminApp, DB_ID);
+const db: any = null; // shims below ignore this; kept for call-site compat
+
+// ── Client-SDK-compatible shims over admin SDK ────────────────
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function doc(_db: any, col: string, id: string) { return fdb.collection(col).doc(id); }
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function collection(_db: any, col: string) { return fdb.collection(col); }
+async function getDoc(ref: any) {
+  const snap = await ref.get();
+  return { exists: () => snap.exists, data: () => snap.data() ?? null, id: snap.id };
+}
+async function setDoc(ref: any, data: object) { await ref.set(data); }
+async function getDocs(ref: any) {
+  const snap = await ref.get();
+  return { empty: snap.empty, docs: snap.docs.map((d: any) => ({ id: d.id, data: () => d.data() })) };
+}
+async function addDoc(ref: any, data: object): Promise<{ id: string }> {
+  const r = await ref.add(data); return { id: r.id };
+}
+async function updateDoc(ref: any, data: object) { await ref.update(data); }
+async function deleteDoc(ref: any) { await ref.delete(); }
 
 // ── Config ────────────────────────────────────────────────────
 const WASENDER_TOKEN = process.env.WASENDER_API_TOKEN || '';
