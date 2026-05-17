@@ -63,6 +63,12 @@ const EVENT_LABELS: Record<EventKey, string> = {
   captain_on_road: 'الكابتن في الطريق',
   booking_completed: 'اكتمال الخدمة',
 };
+const RECIPIENT_OPTIONS: Array<{ value: AutomationRule['recipientType']; label: string }> = [
+  { value: 'manager', label: 'الإدارة' },
+  { value: 'captain', label: 'الكابتن' },
+  { value: 'customer', label: 'العميل' },
+  { value: 'custom', label: 'رقم مخصص' },
+];
 const PREVIEW_VARS: Record<string, string> = {
   id: 'A8F3',
   name: 'محمد أحمد',
@@ -86,6 +92,15 @@ function renderPreview(template: string) {
 
 function recipientLabel(value: AutomationRule['recipientType']) {
   return value === 'manager' ? 'الإدارة' : value === 'captain' ? 'الكابتن' : value === 'customer' ? 'العميل' : 'رقم مخصص';
+}
+
+function buildDefaultRule(trigger: EventKey): AutomationRule {
+  return {
+    id: `r_${trigger}`,
+    enabled: true,
+    trigger,
+    recipientType: trigger === 'new_booking' ? 'manager' : trigger === 'booking_approved' ? 'captain' : 'customer',
+  };
 }
 
 function readSession(): Session | null {
@@ -345,7 +360,7 @@ export default function BackofficeDashboard() {
 
   const visibleNav = [
     { key: 'operations' as const, label: 'العمليات', icon: <LayoutGrid size={20} strokeWidth={1.5} /> },
-    { key: 'messages' as const, label: 'الرسائل', icon: <Bell size={20} strokeWidth={1.5} /> },
+    { key: 'messages' as const, label: 'Automation', icon: <Bell size={20} strokeWidth={1.5} /> },
     { key: 'captains' as const, label: 'الكباتن', icon: <Car size={20} strokeWidth={1.5} /> },
     { key: 'packages' as const, label: 'الباقات', icon: <Zap size={20} strokeWidth={1.5} /> },
     { key: 'finance' as const, label: 'المالية', icon: <Wallet size={20} strokeWidth={1.5} /> },
@@ -385,6 +400,31 @@ export default function BackofficeDashboard() {
     [summaryBookings, priceMap],
   );
 
+  const automationRows = useMemo(
+    () =>
+      (Object.keys(EVENT_LABELS) as EventKey[]).map(event => {
+        const rule = automations.find(item => item.trigger === event) || buildDefaultRule(event);
+        return {
+          event,
+          rule,
+          template: templates?.[event] || { enabled: true, template: '' },
+        };
+      }),
+    [automations, templates],
+  );
+
+  function updateAutomationRule(event: EventKey, patch: Partial<AutomationRule>) {
+    setAutomations(prev => {
+      const next = [...prev];
+      const index = next.findIndex(item => item.trigger === event);
+      if (index >= 0) {
+        next[index] = { ...next[index], ...patch };
+        return next;
+      }
+      return [...next, { ...buildDefaultRule(event), ...patch }];
+    });
+  }
+
   async function performBookingAction(bookingId: string, action: 'approve' | 'reject') {
     const driverId = selectedDrivers[bookingId] || drivers[0]?.id;
     const res = await authFetch('/api/manager/action', {
@@ -416,6 +456,17 @@ export default function BackofficeDashboard() {
     try {
       await Promise.all([
         authFetch('/api/admin/notification-templates', { method: 'POST', body: JSON.stringify({ templates }) }),
+        authFetch('/api/admin/automations', {
+          method: 'POST',
+          body: JSON.stringify({
+            automations: automationRows.map(({ event, rule, template }) => ({
+              ...rule,
+              trigger: event,
+              enabled: template.enabled && rule.enabled,
+              customPhone: rule.recipientType === 'custom' ? rule.customPhone || '' : undefined,
+            })),
+          }),
+        }),
         authFetch('/api/admin/settings/app_config', { method: 'POST', body: JSON.stringify({ value: appConfig }) }),
       ]);
       setMessage('تم حفظ الرسائل والأتمتة');
@@ -494,7 +545,7 @@ export default function BackofficeDashboard() {
             <button
               key={item.key}
               onClick={() => setSection(item.key)}
-              className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors ${section === item.key ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'}`}
+              className={`flex items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors ${section === item.key ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'}`}
             >
               {item.icon}
               {item.label}
@@ -569,69 +620,108 @@ export default function BackofficeDashboard() {
           {section === 'messages' && (
             <div className="space-y-4">
               <div className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-800">
-                <div className="mb-3 flex items-center justify-between">
+                <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
                   <div>
-                    <h2 className="text-lg font-bold text-slate-900 dark:text-white">الرسائل والأتمتة</h2>
-                    <p className="text-sm text-slate-500 dark:text-slate-400">إذا حدث شيء في النظام، فأرسل رسالة واتساب مناسبة مع معاينة قبل الحفظ.</p>
+                    <h2 className="flex items-center gap-2 text-lg font-bold text-slate-900 dark:text-white">
+                      <Bell size={18} />
+                      Automation
+                    </h2>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">Simple flow: choose If, choose Then, edit the message, and review the WhatsApp preview.</p>
                   </div>
-                  <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
-                    <input type="checkbox" checked={appConfig.automationEnabled !== false} onChange={e => setAppConfig(prev => ({ ...prev, automationEnabled: e.target.checked }))} />
-                    تشغيل الأتمتة
+                  <label className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-600 dark:border-slate-700 dark:text-slate-300">
+                    <input
+                      type="checkbox"
+                      checked={appConfig.automationEnabled !== false}
+                      onChange={e => setAppConfig(prev => ({ ...prev, automationEnabled: e.target.checked }))}
+                    />
+                    Enable automation
                   </label>
                 </div>
-                <div className="space-y-3">
-                  {(templates ? Object.keys(templates) : []).map(key => {
-                    const event = key as EventKey;
-                    const eventRules = automations.filter(rule => rule.trigger === event);
-                    return (
-                      <div key={event} className="rounded-xl border border-slate-200 p-4 dark:border-slate-700">
-                        <div className="mb-3 grid gap-3 lg:grid-cols-2">
-                          <div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-900">
-                            <p className="mb-1 text-xs font-semibold text-slate-500 dark:text-slate-400">إذا</p>
-                            <p className="font-semibold text-slate-900 dark:text-white">{EVENT_LABELS[event]}</p>
-                          </div>
-                          <div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-900">
-                            <p className="mb-1 text-xs font-semibold text-slate-500 dark:text-slate-400">فـ</p>
-                            <div className="space-y-1 text-sm text-slate-700 dark:text-slate-200">
-                              {eventRules.length === 0 && <p>لا يوجد مستلمون لهذا الحدث</p>}
-                              {eventRules.map(rule => (
-                                <div key={rule.id} className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2 text-xs dark:border-slate-700">
-                                  <span>{recipientLabel(rule.recipientType)}{rule.customPhone ? ` · ${rule.customPhone}` : ''}</span>
-                                  <span className={rule.enabled ? 'text-green-600' : 'text-slate-400'}>{rule.enabled ? 'مفعّل' : 'متوقف'}</span>
-                                </div>
+
+                <div className="space-y-4">
+                  {automationRows.map(({ event, rule, template }) => (
+                    <div key={event} className="rounded-2xl border border-slate-200 p-4 dark:border-slate-700">
+                      <div className="mb-4 grid gap-3 lg:grid-cols-[1fr_1fr_auto]">
+                        <div className="space-y-2">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">If</p>
+                          <div className="relative">
+                            <select
+                              value={event}
+                              disabled
+                              className="w-full appearance-none rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                            >
+                              {(Object.keys(EVENT_LABELS) as EventKey[]).map(option => (
+                                <option key={option} value={option}>{EVENT_LABELS[option]}</option>
                               ))}
-                            </div>
+                            </select>
+                            <ChevronDown size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                           </div>
                         </div>
-                        <div className="mb-3 flex items-center justify-between gap-3">
-                          <p className="font-semibold text-slate-900 dark:text-white">نص الرسالة</p>
-                          <label className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
-                            <input
-                              type="checkbox"
-                              checked={templates[event].enabled}
-                              onChange={e => setTemplates(prev => prev ? { ...prev, [event]: { ...prev[event], enabled: e.target.checked } } : prev)}
-                            />
-                            مفعّل
-                          </label>
+
+                        <div className="space-y-2">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Then</p>
+                          <div className="relative">
+                            <select
+                              value={rule.recipientType}
+                              onChange={e => updateAutomationRule(event, { recipientType: e.target.value as AutomationRule['recipientType'], customPhone: e.target.value === 'custom' ? rule.customPhone || '' : undefined })}
+                              className="w-full appearance-none rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/30 dark:border-slate-600 dark:bg-slate-700 dark:text-white"
+                            >
+                              {RECIPIENT_OPTIONS.map(option => (
+                                <option key={option.value} value={option.value}>{option.label}</option>
+                              ))}
+                            </select>
+                            <ChevronDown size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                          </div>
                         </div>
-                        <textarea
-                          value={templates[event].template}
-                          onChange={e => setTemplates(prev => prev ? { ...prev, [event]: { ...prev[event], template: e.target.value } } : prev)}
-                          rows={5}
-                          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 dark:border-slate-600 dark:bg-slate-700 dark:text-white"
+
+                        <label className="flex items-center justify-start gap-2 pt-7 text-sm text-slate-600 dark:text-slate-300">
+                          <input
+                            type="checkbox"
+                            checked={template.enabled}
+                            onChange={e => {
+                              setTemplates(prev => prev ? { ...prev, [event]: { ...prev[event], enabled: e.target.checked } } : prev);
+                              updateAutomationRule(event, { enabled: e.target.checked });
+                            }}
+                          />
+                          Enabled
+                        </label>
+                      </div>
+
+                      {rule.recipientType === 'custom' && (
+                        <input
+                          value={rule.customPhone || ''}
+                          onChange={e => updateAutomationRule(event, { customPhone: e.target.value })}
+                          placeholder="07XXXXXXXXX"
+                          dir="ltr"
+                          className="mb-4 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 dark:border-slate-600 dark:bg-slate-700 dark:text-white"
                         />
-                        <div className="mt-3 rounded-2xl border border-slate-200 bg-[#e5ddd5] p-3 dark:border-slate-700 dark:bg-[#0c1317]">
-                          <p className="mb-2 text-[11px] font-semibold text-slate-500 dark:text-slate-400">معاينة واتساب</p>
-                          <MessageCard from="WashTech" body={renderPreview(templates[event].template)} time="10:30" compact={false} />
+                      )}
+
+                      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,380px)]">
+                        <div>
+                          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Message</p>
+                          <textarea
+                            value={template.template}
+                            onChange={e => setTemplates(prev => prev ? { ...prev, [event]: { ...prev[event], template: e.target.value } } : prev)}
+                            rows={5}
+                            className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 dark:border-slate-600 dark:bg-slate-700 dark:text-white"
+                          />
+                          <p className="mt-2 text-xs text-slate-400 dark:text-slate-500">Sends to: {recipientLabel(rule.recipientType)}{rule.recipientType === 'custom' && rule.customPhone ? ` - ${rule.customPhone}` : ''}</p>
+                        </div>
+
+                        <div className="rounded-2xl border border-slate-200 bg-[#e5ddd5] p-3 dark:border-slate-700 dark:bg-[#0c1317]">
+                          <p className="mb-2 text-[11px] font-semibold text-slate-500 dark:text-slate-400">WhatsApp Preview</p>
+                          <MessageCard from="WashTech" body={renderPreview(template.template)} time="10:30" compact={false} />
                         </div>
                       </div>
-                    );
-                  })}
+                    </div>
+                  ))}
                 </div>
+
                 <div className="mt-4">
                   <button onClick={saveMessages} disabled={settingsLoading || !templates} className="flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-50">
                     <Save size={14} />
-                    {settingsLoading ? 'جارٍ الحفظ...' : 'حفظ الرسائل'}
+                    {settingsLoading ? 'Saving...' : 'Save Automation'}
                   </button>
                 </div>
               </div>
