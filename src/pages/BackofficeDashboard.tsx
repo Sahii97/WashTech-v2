@@ -378,14 +378,13 @@ export default function BackofficeDashboard() {
             : bookingTab === 'active' ? ACTIVE_STATUSES.includes(b.status)
             : bookingTab === 'completed' ? ['completed', 'closed'].includes(b.status)
             : b.status === 'rejected',
-        )
-        .filter(b => (driverFilter === 'all' ? true : b.driverId === driverFilter)),
-    [bookings, bookingTab, driverFilter],
+        ),
+    [bookings, bookingTab],
   );
 
   const summaryBookings = useMemo(
-    () => bookings.filter(b => (driverFilter === 'all' ? true : b.driverId === driverFilter)),
-    [bookings, driverFilter],
+    () => bookings,
+    [bookings],
   );
 
   const summaryStats = useMemo(
@@ -405,6 +404,20 @@ export default function BackofficeDashboard() {
         template: templates?.[rule.trigger] || { enabled: true, template: '' },
       })),
     [automations, templates],
+  );
+
+  const financeBookings = useMemo(
+    () =>
+      bookings
+        .filter(b => (driverFilter === 'all' ? true : b.driverId === driverFilter))
+        .map(booking => ({
+          ...booking,
+          amount: booking.financials?.totalAmount || priceMap[booking.package] || priceMap[booking.package?.toLowerCase()] || 0,
+          captainShare: booking.financials?.captainShare || 0,
+          companyShare: booking.financials?.companyShare || 0,
+          captainName: booking.driverId ? drivers.find(d => d.id === booking.driverId)?.name || 'كابتن' : 'غير مخصص',
+        })),
+    [bookings, driverFilter, drivers, priceMap],
   );
 
   function updateAutomationById(id: string, patch: Partial<AutomationRule>) {
@@ -534,7 +547,7 @@ export default function BackofficeDashboard() {
       <header className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white px-6 py-4 dark:border-slate-700 dark:bg-slate-900">
         <div className="flex items-center gap-3">
           <WashTechLogo size={32} />
-          <div className="text-sm text-slate-500 dark:text-slate-400">
+          <div className="text-right text-sm text-slate-500 dark:text-slate-400">
             <div>{session.name}</div>
             <div>إدارة كاملة</div>
           </div>
@@ -576,14 +589,6 @@ export default function BackofficeDashboard() {
                 <StatCard label="قيمة الطلبات" value={`${summaryStats.revenue.toLocaleString('ar-IQ')} د.ع`} icon={<DollarSign className="h-4 w-4 text-emerald-500" />} />
               </div>
 
-              <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-800">
-                <p className="mb-2 text-xs font-semibold text-slate-500 dark:text-slate-400">تصفية حسب الكابتن</p>
-                <div className="flex gap-2 overflow-x-auto">
-                  <FilterChip active={driverFilter === 'all'} onClick={() => setDriverFilter('all')}>كل الكباتن</FilterChip>
-                  {drivers.map(driver => <FilterChip key={driver.id} active={driverFilter === driver.id} onClick={() => setDriverFilter(driver.id)}>{driver.name}</FilterChip>)}
-                </div>
-              </div>
-
               <div className="flex gap-2 overflow-x-auto">
                 {([
                   ['pending', 'قيد الانتظار'],
@@ -591,6 +596,11 @@ export default function BackofficeDashboard() {
                   ['completed', 'مكتملة'],
                   ['rejected', 'مرفوضة'],
                 ] as const).map(([key, label]) => <FilterChip key={key} active={bookingTab === key} onClick={() => setBookingTab(key)}>{label}</FilterChip>)}
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-800">
+                <h2 className="mb-1 text-base font-bold text-slate-900 dark:text-white">لوحة الطلبات</h2>
+                <p className="text-sm text-slate-500 dark:text-slate-400">نظرة سريعة على كل الطلبات مع الحالات والمبالغ.</p>
               </div>
 
               <div className="space-y-3">
@@ -792,13 +802,13 @@ export default function BackofficeDashboard() {
                           <textarea
                             value={template.template}
                             onChange={e => setTemplates(prev => prev ? { ...prev, [rule.trigger]: { ...prev[rule.trigger], template: e.target.value } } : prev)}
-                            rows={5}
+                            rows={8}
                             className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 dark:border-slate-600 dark:bg-slate-700 dark:text-white"
                           />
                           <p className="mt-2 text-xs text-slate-400 dark:text-slate-500">Sends to: {recipientLabel(rule.recipientType)}{rule.recipientType === 'custom' && rule.customPhone ? ` - ${rule.customPhone}` : ''}</p>
                         </div>
 
-                        <div className="rounded-2xl border border-slate-200 bg-[#e5ddd5] p-3 dark:border-slate-700 dark:bg-[#0c1317]">
+                        <div className="min-h-[220px] rounded-2xl border border-slate-200 bg-[#e5ddd5] p-3 dark:border-slate-700 dark:bg-[#0c1317]">
                           <p className="mb-2 text-[11px] font-semibold text-slate-500 dark:text-slate-400">WhatsApp Preview</p>
                           <MessageCard from="WashTech" body={renderPreview(template.template)} time="10:30" compact={false} />
                         </div>
@@ -916,9 +926,16 @@ export default function BackofficeDashboard() {
                 <StatCard label="حصة الكباتن" value={String(finOverview?.captainPayouts?.toLocaleString('ar-IQ') || 0)} icon={<Car className="h-4 w-4 text-blue-500" />} />
                 <StatCard label="مكتملة" value={String(finOverview?.completedCount || 0)} icon={<Check className="h-4 w-4 text-slate-500" />} />
               </div>
+              <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-800">
+                <p className="mb-2 text-xs font-semibold text-slate-500 dark:text-slate-400">تصفية حسب الكابتن</p>
+                <div className="flex gap-2 overflow-x-auto">
+                  <FilterChip active={driverFilter === 'all'} onClick={() => setDriverFilter('all')}>كل الكباتن</FilterChip>
+                  {drivers.map(driver => <FilterChip key={driver.id} active={driverFilter === driver.id} onClick={() => setDriverFilter(driver.id)}>{driver.name}</FilterChip>)}
+                </div>
+              </div>
               <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800">
                 <div className="border-b border-slate-100 px-5 py-4 dark:border-slate-700"><h2 className="font-bold text-slate-900 dark:text-white">المبلغ المطلوب من كل كابتن</h2></div>
-                {finCaptains.map(captain => (
+                {finCaptains.filter(captain => (driverFilter === 'all' ? true : captain.id === driverFilter)).map(captain => (
                   <div key={captain.id} className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-50 px-5 py-3 text-sm last:border-0 dark:border-slate-700">
                     <div>
                       <p className="font-semibold text-slate-900 dark:text-white">{captain.name}</p>
@@ -931,6 +948,46 @@ export default function BackofficeDashboard() {
                   </div>
                 ))}
               </div>
+              <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800">
+                <div className="border-b border-slate-100 px-5 py-4 dark:border-slate-700">
+                  <h2 className="font-bold text-slate-900 dark:text-white">كل الطلبات المالية</h2>
+                  <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">قائمة الطلبات مع مبلغ الطلب، حصة الكابتن، والمطلوب دفعه للشركة.</p>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full text-sm">
+                    <thead className="bg-slate-50 text-slate-500 dark:bg-slate-900 dark:text-slate-400">
+                      <tr>
+                        <th className="px-5 py-3 text-right font-semibold">الطلب</th>
+                        <th className="px-5 py-3 text-right font-semibold">الكابتن</th>
+                        <th className="px-5 py-3 text-right font-semibold">الحالة</th>
+                        <th className="px-5 py-3 text-right font-semibold">المبلغ</th>
+                        <th className="px-5 py-3 text-right font-semibold">حصة الكابتن</th>
+                        <th className="px-5 py-3 text-right font-semibold">المطلوب دفعه للشركة</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {financeBookings.length === 0 && (
+                        <tr>
+                          <td colSpan={6} className="px-5 py-8 text-center text-slate-400 dark:text-slate-500">لا توجد بيانات مالية</td>
+                        </tr>
+                      )}
+                      {financeBookings.map(booking => (
+                        <tr key={booking.id} className="border-t border-slate-100 dark:border-slate-700">
+                          <td className="px-5 py-3">
+                            <div className="font-semibold text-slate-900 dark:text-white">{booking.name}</div>
+                            <div className="text-xs text-slate-400">#{booking.id.slice(-8)}</div>
+                          </td>
+                          <td className="px-5 py-3 text-slate-700 dark:text-slate-200">{booking.captainName}</td>
+                          <td className="px-5 py-3"><StatusBadge status={booking.status} /></td>
+                          <td className="px-5 py-3 font-semibold text-slate-900 dark:text-white">{booking.amount.toLocaleString('ar-IQ')} د.ع</td>
+                          <td className="px-5 py-3 text-blue-600 dark:text-blue-400">{booking.captainShare.toLocaleString('ar-IQ')} د.ع</td>
+                          <td className="px-5 py-3 font-bold text-emerald-600 dark:text-emerald-400">{booking.companyShare.toLocaleString('ar-IQ')} د.ع</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </div>
           )}
 
@@ -939,12 +996,30 @@ export default function BackofficeDashboard() {
               <div className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-800">
                 <h2 className="mb-4 flex items-center gap-2 text-lg font-bold text-slate-900 dark:text-white"><Terminal size={18} /> إعدادات التطبيق</h2>
                 <div className="space-y-3">
-                  <input value={appConfig.appName} onChange={e => setAppConfig(prev => ({ ...prev, appName: e.target.value }))} placeholder="اسم التطبيق" className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm dark:border-slate-600 dark:bg-slate-700 dark:text-white" />
-                  <input value={appConfig.tagline} onChange={e => setAppConfig(prev => ({ ...prev, tagline: e.target.value }))} placeholder="الوصف" className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm dark:border-slate-600 dark:bg-slate-700 dark:text-white" />
-                  <input value={appConfig.supportPhone} onChange={e => setAppConfig(prev => ({ ...prev, supportPhone: e.target.value }))} placeholder="رقم الدعم" dir="ltr" className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm dark:border-slate-600 dark:bg-slate-700 dark:text-white" />
-                  <input value={appConfig.managerPhone} onChange={e => setAppConfig(prev => ({ ...prev, managerPhone: e.target.value }))} placeholder="رقم إشعارات الإدارة" dir="ltr" className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm dark:border-slate-600 dark:bg-slate-700 dark:text-white" />
-                  <input value={appConfig.wasenderToken} onChange={e => setAppConfig(prev => ({ ...prev, wasenderToken: e.target.value }))} placeholder="Wasender token" dir="ltr" type="password" className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm dark:border-slate-600 dark:bg-slate-700 dark:text-white" />
-                  <input value={appConfig.adminPassword} onChange={e => setAppConfig(prev => ({ ...prev, adminPassword: e.target.value }))} placeholder="كلمة مرور الإدارة" dir="ltr" type="password" className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm dark:border-slate-600 dark:bg-slate-700 dark:text-white" />
+                  <label className="block">
+                    <span className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-200">اسم التطبيق</span>
+                    <input value={appConfig.appName} onChange={e => setAppConfig(prev => ({ ...prev, appName: e.target.value }))} placeholder="اسم التطبيق" className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm dark:border-slate-600 dark:bg-slate-700 dark:text-white" />
+                  </label>
+                  <label className="block">
+                    <span className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-200">وصف التطبيق</span>
+                    <input value={appConfig.tagline} onChange={e => setAppConfig(prev => ({ ...prev, tagline: e.target.value }))} placeholder="الوصف" className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm dark:border-slate-600 dark:bg-slate-700 dark:text-white" />
+                  </label>
+                  <label className="block">
+                    <span className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-200">رقم الدعم</span>
+                    <input value={appConfig.supportPhone} onChange={e => setAppConfig(prev => ({ ...prev, supportPhone: e.target.value }))} placeholder="رقم الدعم" dir="ltr" className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm dark:border-slate-600 dark:bg-slate-700 dark:text-white" />
+                  </label>
+                  <label className="block">
+                    <span className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-200">رقم إشعارات الإدارة</span>
+                    <input value={appConfig.managerPhone} onChange={e => setAppConfig(prev => ({ ...prev, managerPhone: e.target.value }))} placeholder="رقم إشعارات الإدارة" dir="ltr" className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm dark:border-slate-600 dark:bg-slate-700 dark:text-white" />
+                  </label>
+                  <label className="block">
+                    <span className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-200">Wasender API Token</span>
+                    <input value={appConfig.wasenderToken} onChange={e => setAppConfig(prev => ({ ...prev, wasenderToken: e.target.value }))} placeholder="Wasender token" dir="ltr" type="password" className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm dark:border-slate-600 dark:bg-slate-700 dark:text-white" />
+                  </label>
+                  <label className="block">
+                    <span className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-200">كلمة مرور الإدارة</span>
+                    <input value={appConfig.adminPassword} onChange={e => setAppConfig(prev => ({ ...prev, adminPassword: e.target.value }))} placeholder="كلمة مرور الإدارة" dir="ltr" type="password" className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm dark:border-slate-600 dark:bg-slate-700 dark:text-white" />
+                  </label>
                 </div>
                 <div className="mt-4 flex flex-wrap gap-3">
                   <button onClick={saveSettings} disabled={settingsLoading} className="flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-50">
