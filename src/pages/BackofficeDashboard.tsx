@@ -19,6 +19,7 @@ import {
   Zap,
 } from 'lucide-react';
 import WashTechLogo from '../components/WashTechLogo';
+import MessageCard from '../components/MessageCard';
 
 type Section = 'operations' | 'messages' | 'captains' | 'packages' | 'finance' | 'settings';
 type Session = { token: string; role: 'admin'; id: string; name: string };
@@ -62,6 +63,30 @@ const EVENT_LABELS: Record<EventKey, string> = {
   captain_on_road: 'الكابتن في الطريق',
   booking_completed: 'اكتمال الخدمة',
 };
+const PREVIEW_VARS: Record<string, string> = {
+  id: 'A8F3',
+  name: 'محمد أحمد',
+  phone: '07901234567',
+  neighborhood: 'عنكاوة',
+  carType: 'sedan',
+  package: 'قياسي',
+  date: 'اليوم',
+  slot: '2:30 مساءً',
+  approveLink: 'washtech.app/go/AB12',
+  rejectLink: 'washtech.app/go/CD34',
+  acceptLink: 'washtech.app/go/EF56',
+  driverName: 'Ali',
+  driverPhone: '07901234567',
+  amount: '25,000',
+};
+
+function renderPreview(template: string) {
+  return template.replace(/\{\{(\w+)\}\}/g, (_, key) => PREVIEW_VARS[key] ?? `{{${key}}}`);
+}
+
+function recipientLabel(value: AutomationRule['recipientType']) {
+  return value === 'manager' ? 'الإدارة' : value === 'captain' ? 'الكابتن' : value === 'customer' ? 'العميل' : 'رقم مخصص';
+}
 
 function readSession(): Session | null {
   try {
@@ -233,9 +258,12 @@ export default function BackofficeDashboard() {
     basicName: 'أساسي',
     standardName: 'قياسي',
     premiumName: 'ممتاز',
-    basicDesc: '',
-    standardDesc: '',
-    premiumDesc: '',
+    basicDesc_ar: '',
+    standardDesc_ar: '',
+    premiumDesc_ar: '',
+    basicDesc_ku: '',
+    standardDesc_ku: '',
+    premiumDesc_ku: '',
   });
   const [appConfig, setAppConfig] = useState({ appName: 'WashTech', tagline: '', supportPhone: '', managerPhone: '', automationEnabled: true, wasenderToken: '', adminPassword: '' });
 
@@ -296,9 +324,12 @@ export default function BackofficeDashboard() {
           basicName: names.basic || 'أساسي',
           standardName: names.standard || 'قياسي',
           premiumName: names.premium || 'ممتاز',
-          basicDesc: typeof descriptions.basic === 'object' ? (descriptions.basic?.ar || '') : (descriptions.basic || ''),
-          standardDesc: typeof descriptions.standard === 'object' ? (descriptions.standard?.ar || '') : (descriptions.standard || ''),
-          premiumDesc: typeof descriptions.premium === 'object' ? (descriptions.premium?.ar || '') : (descriptions.premium || ''),
+          basicDesc_ar: typeof descriptions.basic === 'object' ? (descriptions.basic?.ar || '') : (descriptions.basic || ''),
+          standardDesc_ar: typeof descriptions.standard === 'object' ? (descriptions.standard?.ar || '') : (descriptions.standard || ''),
+          premiumDesc_ar: typeof descriptions.premium === 'object' ? (descriptions.premium?.ar || '') : (descriptions.premium || ''),
+          basicDesc_ku: typeof descriptions.basic === 'object' ? (descriptions.basic?.ku || '') : '',
+          standardDesc_ku: typeof descriptions.standard === 'object' ? (descriptions.standard?.ku || '') : '',
+          premiumDesc_ku: typeof descriptions.premium === 'object' ? (descriptions.premium?.ku || '') : '',
         });
       }
 
@@ -405,9 +436,9 @@ export default function BackofficeDashboard() {
             packagePrices: { basic: financeConfig.basic, standard: financeConfig.standard, premium: financeConfig.premium },
             packageNames: { basic: financeConfig.basicName, standard: financeConfig.standardName, premium: financeConfig.premiumName },
             packageDescriptions: {
-              basic: { ar: financeConfig.basicDesc },
-              standard: { ar: financeConfig.standardDesc },
-              premium: { ar: financeConfig.premiumDesc },
+              basic: { ar: financeConfig.basicDesc_ar, ku: financeConfig.basicDesc_ku },
+              standard: { ar: financeConfig.standardDesc_ar, ku: financeConfig.standardDesc_ku },
+              premium: { ar: financeConfig.premiumDesc_ar, ku: financeConfig.premiumDesc_ku },
             },
           },
         }),
@@ -541,7 +572,7 @@ export default function BackofficeDashboard() {
                 <div className="mb-3 flex items-center justify-between">
                   <div>
                     <h2 className="text-lg font-bold text-slate-900 dark:text-white">الرسائل والأتمتة</h2>
-                    <p className="text-sm text-slate-500 dark:text-slate-400">هنا ترجع قوالب الرسائل وقواعد الإرسال التي كانت مفقودة.</p>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">إذا حدث شيء في النظام، فأرسل رسالة واتساب مناسبة مع معاينة قبل الحفظ.</p>
                   </div>
                   <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
                     <input type="checkbox" checked={appConfig.automationEnabled !== false} onChange={e => setAppConfig(prev => ({ ...prev, automationEnabled: e.target.checked }))} />
@@ -551,14 +582,29 @@ export default function BackofficeDashboard() {
                 <div className="space-y-3">
                   {(templates ? Object.keys(templates) : []).map(key => {
                     const event = key as EventKey;
-                    const recipientList = automations.filter(rule => rule.trigger === event && rule.enabled).map(rule => rule.recipientType).join('، ') || 'لا يوجد مستلمون مفعّلون';
+                    const eventRules = automations.filter(rule => rule.trigger === event);
                     return (
                       <div key={event} className="rounded-xl border border-slate-200 p-4 dark:border-slate-700">
-                        <div className="mb-2 flex items-center justify-between gap-3">
-                          <div>
+                        <div className="mb-3 grid gap-3 lg:grid-cols-2">
+                          <div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-900">
+                            <p className="mb-1 text-xs font-semibold text-slate-500 dark:text-slate-400">إذا</p>
                             <p className="font-semibold text-slate-900 dark:text-white">{EVENT_LABELS[event]}</p>
-                            <p className="text-xs text-slate-500 dark:text-slate-400">المستلمون: {recipientList}</p>
                           </div>
+                          <div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-900">
+                            <p className="mb-1 text-xs font-semibold text-slate-500 dark:text-slate-400">فـ</p>
+                            <div className="space-y-1 text-sm text-slate-700 dark:text-slate-200">
+                              {eventRules.length === 0 && <p>لا يوجد مستلمون لهذا الحدث</p>}
+                              {eventRules.map(rule => (
+                                <div key={rule.id} className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2 text-xs dark:border-slate-700">
+                                  <span>{recipientLabel(rule.recipientType)}{rule.customPhone ? ` · ${rule.customPhone}` : ''}</span>
+                                  <span className={rule.enabled ? 'text-green-600' : 'text-slate-400'}>{rule.enabled ? 'مفعّل' : 'متوقف'}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="mb-3 flex items-center justify-between gap-3">
+                          <p className="font-semibold text-slate-900 dark:text-white">نص الرسالة</p>
                           <label className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
                             <input
                               type="checkbox"
@@ -574,6 +620,10 @@ export default function BackofficeDashboard() {
                           rows={5}
                           className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 dark:border-slate-600 dark:bg-slate-700 dark:text-white"
                         />
+                        <div className="mt-3 rounded-2xl border border-slate-200 bg-[#e5ddd5] p-3 dark:border-slate-700 dark:bg-[#0c1317]">
+                          <p className="mb-2 text-[11px] font-semibold text-slate-500 dark:text-slate-400">معاينة واتساب</p>
+                          <MessageCard from="WashTech" body={renderPreview(templates[event].template)} time="10:30" compact={false} />
+                        </div>
                       </div>
                     );
                   })}
@@ -624,10 +674,10 @@ export default function BackofficeDashboard() {
                 <h2 className="mb-4 text-lg font-bold text-slate-900 dark:text-white">تحرير الباقات</h2>
                 <div className="space-y-4">
                   {([
-                    ['basic', 'الباقة الأساسية', 'basicName', 'basicDesc'],
-                    ['standard', 'الباقة القياسية', 'standardName', 'standardDesc'],
-                    ['premium', 'الباقة الممتازة', 'premiumName', 'premiumDesc'],
-                  ] as const).map(([priceKey, label, nameKey, descKey]) => (
+                    ['basic', 'الباقة الأساسية', 'basicName', 'basicDesc_ar', 'basicDesc_ku'],
+                    ['standard', 'الباقة القياسية', 'standardName', 'standardDesc_ar', 'standardDesc_ku'],
+                    ['premium', 'الباقة الممتازة', 'premiumName', 'premiumDesc_ar', 'premiumDesc_ku'],
+                  ] as const).map(([priceKey, label, nameKey, descArKey, descKuKey]) => (
                     <div key={priceKey} className="rounded-xl border border-slate-200 p-4 dark:border-slate-700">
                       <p className="mb-3 font-semibold text-slate-900 dark:text-white">{label}</p>
                       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -646,10 +696,17 @@ export default function BackofficeDashboard() {
                         />
                       </div>
                       <textarea
-                        value={String(financeConfig[descKey])}
-                        onChange={e => setFinanceConfig(prev => ({ ...prev, [descKey]: e.target.value }))}
+                        value={String(financeConfig[descArKey])}
+                        onChange={e => setFinanceConfig(prev => ({ ...prev, [descArKey]: e.target.value }))}
                         rows={3}
-                        placeholder="وصف الباقة"
+                        placeholder="الوصف بالعربية"
+                        className="mt-3 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm dark:border-slate-600 dark:bg-slate-700 dark:text-white"
+                      />
+                      <textarea
+                        value={String(financeConfig[descKuKey])}
+                        onChange={e => setFinanceConfig(prev => ({ ...prev, [descKuKey]: e.target.value }))}
+                        rows={3}
+                        placeholder="وەسف بە کوردی"
                         className="mt-3 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm dark:border-slate-600 dark:bg-slate-700 dark:text-white"
                       />
                     </div>
@@ -675,23 +732,22 @@ export default function BackofficeDashboard() {
           {section === 'finance' && (
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-                <StatCard label="إجمالي الإيرادات" value={String(finOverview?.totalRevenue?.toLocaleString('ar-IQ') || 0)} icon={<DollarSign className="h-4 w-4 text-green-500" />} />
+                <StatCard label="إجمالي الإيرادات" value={String(finOverview?.totalRevenue?.toLocaleString('ar-IQ') || 0)} icon={<Wallet className="h-4 w-4 text-green-500" />} />
                 <StatCard label="حصة الشركة" value={String(finOverview?.companyRevenue?.toLocaleString('ar-IQ') || 0)} icon={<Wallet className="h-4 w-4 text-emerald-500" />} />
                 <StatCard label="حصة الكباتن" value={String(finOverview?.captainPayouts?.toLocaleString('ar-IQ') || 0)} icon={<Car className="h-4 w-4 text-blue-500" />} />
                 <StatCard label="مكتملة" value={String(finOverview?.completedCount || 0)} icon={<Check className="h-4 w-4 text-slate-500" />} />
               </div>
               <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800">
-                <div className="border-b border-slate-100 px-5 py-4 dark:border-slate-700"><h2 className="font-bold text-slate-900 dark:text-white">ملخص الكباتن</h2></div>
+                <div className="border-b border-slate-100 px-5 py-4 dark:border-slate-700"><h2 className="font-bold text-slate-900 dark:text-white">المبلغ المطلوب من كل كابتن</h2></div>
                 {finCaptains.map(captain => (
                   <div key={captain.id} className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-50 px-5 py-3 text-sm last:border-0 dark:border-slate-700">
                     <div>
                       <p className="font-semibold text-slate-900 dark:text-white">{captain.name}</p>
                       {captain.phone && <p dir="ltr" className="text-xs text-slate-400">{captain.phone}</p>}
                     </div>
-                    <div className="flex gap-4 text-xs">
-                      <div><p className="text-slate-400">الرصيد</p><p dir="ltr" className="font-bold text-slate-700 dark:text-slate-300">{captain.balance.toLocaleString('ar-IQ')}</p></div>
-                      <div><p className="text-slate-400">المكتسب</p><p dir="ltr" className="font-bold text-blue-600">{captain.totalEarned.toLocaleString('ar-IQ')}</p></div>
-                      <div><p className="text-slate-400">المستلم</p><p dir="ltr" className="font-bold text-green-600">{(captain.totalCollected || 0).toLocaleString('ar-IQ')}</p></div>
+                    <div className="text-left text-xs">
+                      <p className="text-slate-400">المطلوب للشركة</p>
+                      <p dir="ltr" className={`font-bold ${captain.balance < 0 ? 'text-red-500' : 'text-green-600'}`}>{Math.abs(captain.balance).toLocaleString('ar-IQ')} د.ع</p>
                     </div>
                   </div>
                 ))}
